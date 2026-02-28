@@ -1,0 +1,176 @@
+---
+import Layout from "../layouts/Layout.astro";
+import {
+    createSupabaseServerClient,
+    createSupabaseAdminClient,
+} from "../lib/supabase";
+import { sendVerificationEmail } from "../lib/email";
+import AuthLeftPanel from "../components/auth/AuthLeftPanel.astro";
+import AuthErrorMessage from "../components/auth/AuthErrorMessage.astro";
+import AuthFormField from "../components/auth/AuthFormField.astro";
+
+let errorMessage = "";
+
+if (Astro.request.method === "POST") {
+    const formData = await Astro.request.formData();
+    const email = formData.get("email")?.toString() ?? "";
+    const password = formData.get("password")?.toString() ?? "";
+
+    const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
+    const { error } = await supabase.auth.signUp({ email, password });
+
+    if (error) {
+        errorMessage = error.message;
+    } else {
+        // Generate a random 6-digit OTP
+        const code = String(Math.floor(100000 + Math.random() * 900000));
+
+        // Store it in Supabase (admin client bypasses RLS)
+        const admin = createSupabaseAdminClient();
+        await admin.from("email_verifications").insert({
+            email,
+            code,
+            expires_at: new Date(Date.now() + 3 * 60 * 1000).toISOString(),
+        });
+
+        // Send the verification email
+        try {
+            await sendVerificationEmail(email, code);
+        } catch (emailErr) {
+            console.error("Email send failed:", emailErr);
+            // Don't block registration — user can try resending
+        }
+
+        return Astro.redirect(
+            `/check-email?email=${encodeURIComponent(email)}`
+        );
+    }
+}
+---
+
+<Layout
+    title="Create Account — Zync"
+    description="Sign up for a free Zync account."
+>
+    <!-- ── Top-left logo ── -->
+    <a
+        href="/"
+        class="fixed top-5 left-6 z-50 text-2xl font-black bg-gradient-to-r from-cyan to-pink bg-clip-text text-transparent hover:opacity-80 transition-opacity"
+    >
+        Zync
+    </a>
+
+    <div class="min-h-screen flex">
+        <!-- ── Left Panel ── -->
+        <AuthLeftPanel accent="pink">
+            <p class="text-xl font-semibold text-clean leading-snug">
+                One link to rule them all.<br />Start for free today.
+            </p>
+            <p class="text-sm text-muted">
+                Join thousands of creators who use Zync to manage links, track
+                analytics, and grow their audience.
+            </p>
+
+            <!-- Feature checklist -->
+            <ul class="space-y-3 pt-2 text-left">
+                {
+                    [
+                        "Unlimited short links",
+                        "Real-time click analytics",
+                        "AI-powered meta tags",
+                        "Deep linking for apps",
+                        "Phishing shield — ML protected",
+                    ].map((feature) => (
+                        <li class="flex items-center gap-3 text-sm text-muted">
+                            <span class="flex-shrink-0 w-5 h-5 rounded-full bg-cyan/15 border border-cyan/30 flex items-center justify-center">
+                                <svg
+                                    class="w-3 h-3 text-cyan"
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                >
+                                    <path
+                                        fill-rule="evenodd"
+                                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                        clip-rule="evenodd"
+                                    />
+                                </svg>
+                            </span>
+                            {feature}
+                        </li>
+                    ))
+                }
+            </ul>
+        </AuthLeftPanel>
+
+        <!-- ── Right Panel (Form) ── -->
+        <div
+            class="w-full lg:w-1/2 flex flex-col items-center justify-center min-h-screen px-6 py-12 bg-[#0B0F19]"
+        >
+            <div class="w-full max-w-md space-y-8">
+                <!-- Heading -->
+                <div class="space-y-1">
+                    <h1 class="text-3xl font-black text-clean">
+                        Create an account
+                    </h1>
+                    <p class="text-sm text-muted">
+                        Free forever. No credit card required.
+                    </p>
+                </div>
+
+                <AuthErrorMessage message={errorMessage} />
+                <!-- Register form -->
+                <form method="POST" class="space-y-4" novalidate>
+                    <AuthFormField
+                        id="email"
+                        label="Email"
+                        type="email"
+                        autocomplete="email"
+                        placeholder="you@example.com"
+                    />
+
+                    <AuthFormField
+                        id="password"
+                        label="Password"
+                        type="password"
+                        autocomplete="new-password"
+                        placeholder="••••••••"
+                        hint="Minimum 8 characters."
+                    />
+
+                    <button
+                        type="submit"
+                        class="w-full py-3.5 bg-cyan hover:bg-cyan/90 text-midnight font-bold rounded-xl text-sm transition-all duration-150 active:scale-[0.98] shadow-[0_0_20px_rgba(6,182,212,0.35)] hover:shadow-[0_0_32px_rgba(6,182,212,0.55)] mt-2"
+                    >
+                        Create Account — It's Free
+                    </button>
+
+                    <p class="text-xs text-center text-muted/60 pt-1">
+                        By signing up you agree to our
+                        <a
+                            href="/terms"
+                            class="underline hover:text-clean transition-colors"
+                            >Terms</a
+                        >
+                        and
+                        <a
+                            href="/privacy"
+                            class="underline hover:text-clean transition-colors"
+                            >Privacy Policy</a
+                        >.
+                    </p>
+                </form>
+
+                <!-- Toggle link -->
+                <p class="text-center text-sm text-muted">
+                    Already have an account?
+                    <a
+                        href="/login"
+                        class="text-cyan font-semibold hover:text-cyan/80 transition-colors ml-1"
+                    >
+                        Sign in →
+                    </a>
+                </p>
+            </div>
+        </div>
+    </div>
+</Layout>

@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+    --color-midnight: #0B0F19;
+    --color-river: #1E293B;
+    --color-cyan: #06B6D4;
+    --color-pink: #EC4899;
+    --color-clean: #F8FAFC;
+    --color-muted: #94A3B8;
+    --font-sans: "Inter", system-ui, sans-serif;
+}
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+    }
+
+    body {
+        background-color: #0B0F19;
+        color: #F8FAFC;
+        font-family: "Inter", system-ui, sans-serif;
+    }
+}

@@ -1,0 +1,181 @@
+---
+import type { Link } from "../../types/dashboard";
+
+interface Props {
+    links: Link[];
+    baseUrl: string;
+}
+
+const { links, baseUrl } = Astro.props;
+
+function formatDate(iso: string): string {
+    return new Date(iso).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+    });
+}
+
+function truncate(str: string, n: number) {
+    return str.length > n ? str.slice(0, n) + "…" : str;
+}
+---
+
+{
+    links.length === 0 && (
+        <div class="rounded-2xl border border-dashed border-white/10 bg-river/40 py-20 flex flex-col items-center justify-center text-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-cyan/10 border border-cyan/20 flex items-center justify-center">
+                <svg
+                    class="w-7 h-7 text-cyan"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    viewBox="0 0 24 24"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"
+                    />
+                </svg>
+            </div>
+            <div>
+                <p class="text-clean font-semibold text-base">No links yet</p>
+                <p class="text-muted text-sm mt-1">
+                    Create your first Zync link and start tracking clicks.
+                </p>
+            </div>
+            <a
+                href="/dashboard/new"
+                class="mt-2 inline-flex items-center gap-2 px-5 py-2.5 bg-cyan hover:bg-cyan/90 text-midnight font-bold rounded-xl text-sm transition-all duration-150 shadow-[0_0_20px_rgba(6,182,212,0.3)]"
+            >
+                <span>✨</span> Create your first link
+            </a>
+        </div>
+    )
+}
+
+{
+    links.length > 0 && (
+        <div class="rounded-2xl border border-white/5 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-white/5 bg-river">
+                            <th class="text-left px-5 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider">
+                                Short Link
+                            </th>
+                            <th class="text-left px-5 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider">
+                                Original URL
+                            </th>
+                            <th class="text-right px-5 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider">
+                                Clicks
+                            </th>
+                            <th class="text-left px-5 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider">
+                                Created
+                            </th>
+                            <th class="text-center px-5 py-3.5 text-xs font-semibold text-muted uppercase tracking-wider">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/5">
+                        {links.map((link) => (
+                            <tr class="group hover:bg-[#1E293B]/50 transition-colors duration-150">
+                                <td class="px-5 py-4">
+                                    <a
+                                        href={`${baseUrl}/${link.alias}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="text-cyan font-mono font-semibold hover:text-cyan/80 transition-colors"
+                                    >
+                                        {link.alias}
+                                    </a>
+                                </td>
+                                <td class="px-5 py-4 max-w-[240px]">
+                                    <span
+                                        class="text-muted font-mono text-xs"
+                                        title={link.original_url}
+                                    >
+                                        {truncate(link.original_url, 45)}
+                                    </span>
+                                </td>
+                                <td class="px-5 py-4 text-right">
+                                    <span class="text-clean font-bold tabular-nums">
+                                        {link.click_count ?? 0}
+                                    </span>
+                                </td>
+                                <td class="px-5 py-4 text-muted text-xs whitespace-nowrap">
+                                    {formatDate(link.created_at)}
+                                </td>
+                                <td class="px-5 py-4">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <button
+                                            type="button"
+                                            data-copy={`${baseUrl}/${link.alias}`}
+                                            class="copy-btn w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-muted hover:text-cyan hover:border-cyan/30 hover:bg-cyan/10 transition-all duration-150"
+                                            title="Copy link"
+                                        >
+                                            <svg
+                                                class="w-3.5 h-3.5"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                                />
+                                            </svg>
+                                        </button>
+                                        <a
+                                            href={`/link/${link.id}`}
+                                            class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-muted hover:text-pink hover:border-pink/30 hover:bg-pink/10 transition-all duration-150"
+                                            title="View analytics"
+                                        >
+                                            <svg
+                                                class="w-3.5 h-3.5"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"
+                                                />
+                                            </svg>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    )
+}
+
+<script>
+    document.querySelectorAll<HTMLButtonElement>(".copy-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const url = btn.dataset.copy ?? "";
+            await navigator.clipboard.writeText(url);
+            const orig = btn.innerHTML;
+            btn.innerHTML = `<svg class="w-3.5 h-3.5 text-cyan" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`;
+            btn.classList.add("border-cyan/40", "bg-cyan/10", "text-cyan");
+            setTimeout(() => {
+                btn.innerHTML = orig;
+                btn.classList.remove(
+                    "border-cyan/40",
+                    "bg-cyan/10",
+                    "text-cyan"
+                );
+            }, 1500);
+        });
+    });
+</script>

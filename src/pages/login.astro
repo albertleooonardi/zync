@@ -1,0 +1,123 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { createSupabaseServerClient } from "../lib/supabase";
+import AuthLeftPanel from "../components/auth/AuthLeftPanel.astro";
+import AuthErrorMessage from "../components/auth/AuthErrorMessage.astro";
+import AuthFormField from "../components/auth/AuthFormField.astro";
+
+let errorMessage = "";
+
+if (Astro.request.method === "POST") {
+    const formData = await Astro.request.formData();
+    const email = formData.get("email")?.toString() ?? "";
+    const password = formData.get("password")?.toString() ?? "";
+
+    const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
+    const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+    });
+
+    if (error) {
+        errorMessage = error.message;
+    } else {
+        return Astro.redirect("/dashboard");
+    }
+}
+---
+
+<Layout title="Login — Zync" description="Sign in to your Zync account.">
+    <!-- ── Top-left logo ── -->
+    <a
+        href="/"
+        class="fixed top-5 left-6 z-50 text-2xl font-black bg-gradient-to-r from-cyan to-pink bg-clip-text text-transparent hover:opacity-80 transition-opacity"
+    >
+        Zync
+    </a>
+
+    <div class="min-h-screen flex">
+        <!-- ── Left Panel ── -->
+        <AuthLeftPanel accent="cyan">
+            <p class="text-xl font-semibold text-clean leading-snug">
+                Track every click.<br />Grow your audience.
+            </p>
+            <p class="text-sm text-muted">
+                The smartest link shortener for creators and marketers who mean
+                business.
+            </p>
+
+            <!-- Floating stats -->
+            <div class="flex items-center justify-center gap-6 pt-4">
+                <div class="text-center">
+                    <div class="text-2xl font-black text-cyan">5M+</div>
+                    <div class="text-xs text-muted mt-0.5">Links Created</div>
+                </div>
+                <div class="w-px h-10 bg-white/10"></div>
+                <div class="text-center">
+                    <div class="text-2xl font-black text-pink">98%</div>
+                    <div class="text-xs text-muted mt-0.5">Uptime SLA</div>
+                </div>
+                <div class="w-px h-10 bg-white/10"></div>
+                <div class="text-center">
+                    <div class="text-2xl font-black text-cyan">120+</div>
+                    <div class="text-xs text-muted mt-0.5">Countries</div>
+                </div>
+            </div>
+        </AuthLeftPanel>
+
+        <!-- ── Right Panel (Form) ── -->
+        <div
+            class="w-full lg:w-1/2 flex flex-col items-center justify-center min-h-screen px-6 py-12 bg-[#0B0F19]"
+        >
+            <div class="w-full max-w-md space-y-8">
+                <!-- Heading -->
+                <div class="space-y-1">
+                    <h1 class="text-3xl font-black text-clean">Welcome back</h1>
+                    <p class="text-sm text-muted">
+                        Sign in to continue to your dashboard.
+                    </p>
+                </div>
+
+                <AuthErrorMessage message={errorMessage} />
+
+                <!-- Login form -->
+                <form method="POST" class="space-y-4" novalidate>
+                    <AuthFormField
+                        id="email"
+                        label="Email"
+                        type="email"
+                        autocomplete="email"
+                        placeholder="you@example.com"
+                    />
+
+                    <AuthFormField
+                        id="password"
+                        label="Password"
+                        type="password"
+                        autocomplete="current-password"
+                        placeholder="••••••••"
+                        labelSuffix="<a href='/forgot-password' class='text-xs text-cyan/80 hover:text-cyan transition-colors'>Forgot password?</a>"
+                    />
+
+                    <button
+                        type="submit"
+                        class="w-full py-3.5 bg-cyan hover:bg-cyan/90 text-midnight font-bold rounded-xl text-sm transition-all duration-150 active:scale-[0.98] shadow-[0_0_20px_rgba(6,182,212,0.35)] hover:shadow-[0_0_32px_rgba(6,182,212,0.55)] mt-2"
+                    >
+                        Sign In
+                    </button>
+                </form>
+
+                <!-- Toggle link -->
+                <p class="text-center text-sm text-muted">
+                    Don't have an account?
+                    <a
+                        href="/register"
+                        class="text-cyan font-semibold hover:text-cyan/80 transition-colors ml-1"
+                    >
+                        Create one free →
+                    </a>
+                </p>
+            </div>
+        </div>
+    </div>
+</Layout>

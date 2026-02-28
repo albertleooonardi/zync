@@ -1,0 +1,32 @@
+---
+// Footer component — minimalist with copyright and links
+const year = new Date().getFullYear();
+---
+
+<footer class="border-t border-white/5 py-10 px-4 sm:px-6">
+    <div
+        class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4"
+    >
+        <!-- Logo + copyright -->
+        <div class="flex items-center gap-3">
+            <span
+                class="text-lg font-black bg-gradient-to-r from-cyan to-pink bg-clip-text text-transparent"
+            >
+                Zync
+            </span>
+            <span class="text-muted/50 text-xs">
+                © {year} Zync, Inc. All rights reserved.
+            </span>
+        </div>
+
+        <!-- Footer links -->
+        <nav
+            class="flex items-center gap-5 text-xs text-muted hover:[&>a]:text-clean [&>a]:transition-colors"
+        >
+            <a href="/terms">Terms</a>
+            <a href="/privacy">Privacy</a>
+            <a href="/docs/api">API</a>
+            <a href="/blog">Blog</a>
+        </nav>
+    </div>
+</footer>

@@ -1,0 +1,63 @@
+---
+interface GeoItem {
+    country: string;
+    count: number;
+    percent: number;
+}
+
+interface Props {
+    geoData: GeoItem[];
+}
+
+const { geoData } = Astro.props;
+
+// Simple country code → flag emoji
+function countryFlag(code: string): string {
+    if (!code || code.length !== 2) return "🌍";
+    const codePoints = [...code.toUpperCase()].map(
+        (c) => 127397 + c.charCodeAt(0)
+    );
+    return String.fromCodePoint(...codePoints);
+}
+---
+
+<div class="rounded-2xl bg-river border border-white/5 p-5 space-y-4 h-full">
+    <h3 class="text-sm font-bold text-clean">Top Countries</h3>
+
+    {
+        geoData.length === 0 ? (
+            <p class="text-xs text-muted/60 py-4 text-center">
+                No location data yet.
+            </p>
+        ) : (
+            <ol class="space-y-3">
+                {geoData.map((g, i) => (
+                    <li class="flex items-center gap-3">
+                        <span class="text-xs text-muted/60 tabular-nums w-4 text-right flex-shrink-0">
+                            {i + 1}
+                        </span>
+                        <span class="text-xl leading-none flex-shrink-0">
+                            {countryFlag(g.country)}
+                        </span>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm text-clean truncate">
+                                    {g.country || "Unknown"}
+                                </span>
+                                <span class="text-xs tabular-nums text-muted ml-2">
+                                    {g.count}
+                                </span>
+                            </div>
+                            <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+                                <div
+                                    class="h-full rounded-full bg-gradient-to-r from-cyan to-pink transition-all duration-500"
+                                    style={`width: ${g.percent}%`}
+                                />
+                            </div>
+                        </div>
+                    </li>
+                ))}
+            </ol>
+        )
+    }
+</div>

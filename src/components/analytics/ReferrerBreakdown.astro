@@ -1,0 +1,49 @@
+---
+interface ReferrerItem {
+    name: string;
+    count: number;
+    percent: number;
+}
+
+interface Props {
+    referrers: ReferrerItem[];
+}
+
+const { referrers } = Astro.props;
+---
+
+<div class="rounded-2xl bg-river border border-white/5 p-5 space-y-4 h-full">
+    <h3 class="text-sm font-bold text-clean">Referrers</h3>
+
+    {
+        referrers.length === 0 ? (
+            <p class="text-xs text-muted/60 py-4 text-center">
+                No referrer data yet.
+            </p>
+        ) : (
+            <ul class="space-y-3">
+                {referrers.map((r) => (
+                    <li>
+                        <div class="flex items-center justify-between mb-1">
+                            <span
+                                class="text-sm text-clean truncate max-w-[140px]"
+                                title={r.name}
+                            >
+                                {r.name}
+                            </span>
+                            <span class="text-sm tabular-nums text-muted ml-2">
+                                {r.count}
+                            </span>
+                        </div>
+                        <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+                            <div
+                                class="h-full rounded-full bg-pink transition-all duration-500"
+                                style={`width: ${r.percent}%`}
+                            />
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        )
+    }
+</div>

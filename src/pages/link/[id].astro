@@ -1,0 +1,210 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { createSupabaseServerClient } from "../../lib/supabase";
+import DashboardNav from "../../components/dashboard/DashboardNav.astro";
+import AnalyticsHeader from "../../components/analytics/AnalyticsHeader.astro";
+import ClicksChart from "../../components/analytics/ClicksChart.astro";
+import ReferrerBreakdown from "../../components/analytics/ReferrerBreakdown.astro";
+import DeviceBreakdown from "../../components/analytics/DeviceBreakdown.astro";
+import GeoBreakdown from "../../components/analytics/GeoBreakdown.astro";
+
+// ── Auth guard ────────────────────────────────────────────────────────────────
+const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
+const {
+    data: { session },
+} = await supabase.auth.getSession();
+if (!session) return Astro.redirect("/login");
+const user = session.user;
+
+// ── Fetch link (ownership check) ──────────────────────────────────────────────
+const { id } = Astro.params;
+const { data: link, error: linkError } = await supabase
+    .from("links")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", user.id) // security: only owner can view analytics
+    .maybeSingle();
+
+if (linkError || !link) {
+    return new Response(null, { status: 404 });
+}
+
+// ── Fetch all clicks for this link ────────────────────────────────────────────
+const { data: clicks = [] } = await supabase
+    .from("clicks")
+    .select("clicked_at, country, referrer, user_agent, device")
+    .eq("link_id", id)
+    .order("clicked_at", { ascending: true });
+
+const safeClicks = clicks ?? [];
+
+// ── Helper: detect device from user_agent ─────────────────────────────────────
+function detectDevice(ua: string | null): string {
+    if (!ua) return "unknown";
+    const u = ua.toLowerCase();
+    if (/ipad|tablet|(android(?!.*mobile))/.test(u)) return "tablet";
+    if (/mobile|android|iphone|ipod|blackberry|opera mini|iemobile/.test(u))
+        return "mobile";
+    return "desktop";
+}
+
+// ── Aggregate: clicks per day (last 30 days) ──────────────────────────────────
+function buildChartData() {
+    const days: Record<string, number> = {};
+    const today = new Date();
+    for (let i = 29; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        days[key] = 0;
+    }
+    for (const c of safeClicks) {
+        const key = c.clicked_at.slice(0, 10);
+        if (key in days) days[key]++;
+    }
+    const labels = Object.keys(days).map((d) => {
+        const dt = new Date(d + "T00:00:00");
+        return dt.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+        });
+    });
+    return { labels, values: Object.values(days) };
+}
+
+// ── Aggregate: referrers ──────────────────────────────────────────────────────
+function buildReferrers() {
+    const counts: Record<string, number> = {};
+    for (const c of safeClicks) {
+        let name = "Direct";
+        if (c.referrer) {
+            try {
+                const u = new URL(c.referrer);
+                name = u.hostname.replace(/^www\./, "");
+            } catch {
+                name = c.referrer.slice(0, 30);
+            }
+        }
+        counts[name] = (counts[name] ?? 0) + 1;
+    }
+    const total = safeClicks.length || 1;
+    return Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([name, count]) => ({
+            name,
+            count,
+            percent: Math.round((count / total) * 100),
+        }));
+}
+
+// ── Aggregate: devices ────────────────────────────────────────────────────────
+function buildDevices() {
+    const counts: Record<string, number> = {};
+    for (const c of safeClicks) {
+        const dev =
+            c.device && c.device !== "unknown"
+                ? c.device
+                : detectDevice(c.user_agent);
+        counts[dev] = (counts[dev] ?? 0) + 1;
+    }
+    const total = safeClicks.length || 1;
+    return Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, count]) => ({
+            name,
+            count,
+            percent: Math.round((count / total) * 100),
+        }));
+}
+
+// ── Aggregate: geography ──────────────────────────────────────────────────────
+function buildGeo() {
+    const counts: Record<string, number> = {};
+    for (const c of safeClicks) {
+        const country = c.country || "Unknown";
+        counts[country] = (counts[country] ?? 0) + 1;
+    }
+    const total = safeClicks.length || 1;
+    return Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([country, count]) => ({
+            country,
+            count,
+            percent: Math.round((count / total) * 100),
+        }));
+}
+
+const chartData = buildChartData();
+const referrers = buildReferrers();
+const devices = buildDevices();
+const geoData = buildGeo();
+const totalClicks = safeClicks.length;
+const shortUrl = `${Astro.url.host}/${link.alias}`;
+---
+
+<Layout
+    title={`Analytics — ${link.alias} — Zync`}
+    description={`Click analytics for ${link.alias}`}
+>
+    <DashboardNav userEmail={user.email} />
+
+    <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+        <!-- Header -->
+        <AnalyticsHeader
+            alias={link.alias}
+            originalUrl={link.original_url}
+            shortUrl={shortUrl}
+            linkId={link.id}
+        />
+
+        <!-- Quick stat pills -->
+        <div class="flex flex-wrap gap-3">
+            {
+                [
+                    {
+                        label: "Total Clicks",
+                        value: totalClicks.toLocaleString(),
+                        color: "text-cyan",
+                    },
+                    {
+                        label: "Created",
+                        value: new Date(link.created_at).toLocaleDateString(
+                            "en-US",
+                            { month: "short", day: "numeric", year: "numeric" }
+                        ),
+                        color: "text-clean",
+                    },
+                    {
+                        label: "Top Referrer",
+                        value: referrers[0]?.name ?? "—",
+                        color: "text-pink",
+                    },
+                    {
+                        label: "Top Country",
+                        value: geoData[0]?.country ?? "—",
+                        color: "text-clean",
+                    },
+                ].map(({ label, value, color }) => (
+                    <div class="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-river border border-white/5">
+                        <span class="text-xs text-muted">{label}</span>
+                        <span class={`text-sm font-bold ${color}`}>
+                            {value}
+                        </span>
+                    </div>
+                ))
+            }
+        </div>
+
+        <!-- Clicks chart -->
+        <ClicksChart data={chartData} totalClicks={totalClicks} />
+
+        <!-- Breakdown grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <ReferrerBreakdown referrers={referrers} />
+            <DeviceBreakdown devices={devices} />
+            <GeoBreakdown geoData={geoData} />
+        </div>
+    </main>
+</Layout>

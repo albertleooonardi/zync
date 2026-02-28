@@ -1,0 +1,88 @@
+---
+// Navbar component — fixed, backdrop-blur, gradient logo
+---
+
+<header
+    class="fixed top-0 inset-x-0 z-50 border-b border-white/5 backdrop-blur-md bg-midnight/70"
+>
+    <nav
+        class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between"
+    >
+        <!-- Logo -->
+        <a
+            href="/"
+            class="text-2xl font-black tracking-tight bg-gradient-to-r from-cyan to-pink bg-clip-text text-transparent hover:opacity-90 transition-opacity"
+        >
+            Zync
+        </a>
+
+        <!-- Center nav links -->
+        <div class="flex items-center gap-3 sm:gap-7">
+            <a href="/features" class="nav-gradient-link text-sm font-medium">
+                <span class="nav-default">Features</span>
+                <span class="nav-gradient" aria-hidden="true">Features</span>
+            </a>
+            <a href="/pricing" class="nav-gradient-link text-sm font-medium">
+                <span class="nav-default">Pricing</span>
+                <span class="nav-gradient" aria-hidden="true">Pricing</span>
+            </a>
+            <a href="/blog" class="nav-gradient-link text-sm font-medium">
+                <span class="nav-default">Blog</span>
+                <span class="nav-gradient" aria-hidden="true">Blog</span>
+            </a>
+        </div>
+
+        <!-- Nav actions -->
+        <div class="flex items-center gap-3 sm:gap-5">
+            <a href="/login" class="nav-gradient-link text-sm font-medium">
+                <span class="nav-default">Login</span>
+                <span class="nav-gradient" aria-hidden="true">Login</span>
+            </a>
+            <a
+                href="/signup"
+                id="nav-signup-btn"
+                class="text-sm font-semibold px-4 py-2 rounded-lg bg-cyan text-midnight hover:bg-cyan/90 active:scale-95 transition-all duration-150 shadow-[0_0_16px_rgba(6,182,212,0.35)]"
+            >
+                Sign Up
+            </a>
+        </div>
+    </nav>
+</header>
+
+<style>
+    /* Nav link base: stacks two spans on top of each other */
+    .nav-gradient-link {
+        position: relative;
+        display: inline-block;
+        cursor: pointer;
+    }
+
+    /* Default muted text — fades out on hover */
+    .nav-gradient-link .nav-default {
+        display: block;
+        color: #94a3b8;
+        transition: opacity 0.35s ease;
+    }
+
+    /* Gradient text — sits on top, fades in on hover */
+    .nav-gradient-link .nav-gradient {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to right, #06b6d4, #ec4899);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+        opacity: 0;
+        transition: opacity 0.35s ease;
+        white-space: nowrap;
+    }
+
+    /* On hover: swap opacity */
+    .nav-gradient-link:hover .nav-default {
+        opacity: 0;
+    }
+    .nav-gradient-link:hover .nav-gradient {
+        opacity: 1;
+    }
+</style>

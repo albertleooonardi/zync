@@ -1,0 +1,204 @@
+---
+import Layout from "../../layouts/Layout.astro";
+// import { createSupabaseServerClient } from "../../lib/supabase";
+import DashboardNav from "../../components/dashboard/DashboardNav.astro";
+import StatCard from "../../components/dashboard/StatCard.astro";
+import LinksTable from "../../components/dashboard/LinksTable.astro";
+import type { Link } from "../../types/dashboard";
+
+// ── AUTH BYPASSED FOR PREVIEW — restore the block below when done ─────────────
+// const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
+// const { data: { session } } = await supabase.auth.getSession();
+// if (!session) return Astro.redirect("/login");
+// const user = session.user;
+
+const user = { email: "demo@zync.app" };
+
+// ── MOCK DATA (remove when restoring auth) ────────────────────────────────────
+const links: Link[] = [
+    {
+        id: "1",
+        user_id: "u1",
+        alias: "my-portfolio",
+        original_url: "https://myportfolio.example.com/about",
+        created_at: "2026-02-10T08:00:00Z",
+        click_count: 342,
+    },
+    {
+        id: "2",
+        user_id: "u1",
+        alias: "zync-docs",
+        original_url: "https://docs.zync.app/getting-started",
+        created_at: "2026-02-15T12:30:00Z",
+        click_count: 187,
+    },
+    {
+        id: "3",
+        user_id: "u1",
+        alias: "launch-tweet",
+        original_url: "https://twitter.com/zync/status/1234567890",
+        created_at: "2026-02-20T09:15:00Z",
+        click_count: 94,
+    },
+    {
+        id: "4",
+        user_id: "u1",
+        alias: "product-hunt",
+        original_url: "https://www.producthunt.com/posts/zync",
+        created_at: "2026-02-25T16:00:00Z",
+        click_count: 511,
+    },
+    {
+        id: "5",
+        user_id: "u1",
+        alias: "newsletter",
+        original_url: "https://newsletter.example.com/issue-12",
+        created_at: "2026-02-28T07:00:00Z",
+        click_count: 63,
+    },
+];
+
+// ── Compute stats ─────────────────────────────────────────────────────────────
+const totalLinks = links.length;
+const totalClicks = links.reduce((sum, l) => sum + (l.click_count ?? 0), 0);
+const topLink = links.reduce<Link | null>(
+    (best, l) =>
+        !best || (l.click_count ?? 0) > (best.click_count ?? 0) ? l : best,
+    null
+);
+
+const baseUrl = Astro.url.origin;
+const createdAlias = Astro.url.searchParams.get("created");
+
+// Time-aware greeting
+const hour = new Date().getHours();
+const greeting =
+    hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+---
+
+<Layout
+    title="Dashboard — Zync"
+    description="Manage your Zync links and analytics."
+>
+    <DashboardNav userEmail={user.email} />
+
+    {createdAlias && (
+        <div
+            id="success-toast"
+            class="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-river border border-cyan/30 shadow-[0_0_30px_rgba(6,182,212,0.2)] text-sm font-medium text-clean"
+        >
+            <span class="w-6 h-6 rounded-full bg-cyan/15 flex items-center justify-center flex-shrink-0">
+                <svg class="w-3.5 h-3.5 text-cyan" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+            </span>
+            Link <span class="font-mono text-cyan">/{createdAlias}</span> created!
+            <button onclick="document.getElementById('success-toast').remove()" class="ml-2 text-muted hover:text-clean transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <script>setTimeout(() => document.getElementById('success-toast')?.remove(), 4000);</script>
+    )}
+
+    <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+        <!-- Header -->
+        <div
+            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+        >
+            <div>
+                <h1 class="text-3xl font-black text-clean">
+                    {greeting}, <span
+                        class="bg-gradient-to-r from-cyan to-pink bg-clip-text text-transparent"
+                        >{user.email?.split("@")[0]}</span
+                    > 👋
+                </h1>
+                <p class="text-sm text-muted mt-1">
+                    Here's what's happening with your links.
+                </p>
+            </div>
+            <a
+                href="/dashboard/new"
+                class="inline-flex items-center gap-2 px-5 py-3 bg-cyan hover:bg-cyan/90 text-midnight font-bold rounded-xl text-sm transition-all duration-150 active:scale-[0.98] shadow-[0_0_20px_rgba(6,182,212,0.35)] hover:shadow-[0_0_32px_rgba(6,182,212,0.55)] whitespace-nowrap self-start sm:self-auto"
+            >
+                <span>✨</span> Create New Zync
+            </a>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <StatCard label="Total Links" value={totalLinks} accent="cyan">
+                <svg
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    viewBox="0 0 24 24"
+                    class="w-5 h-5"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"
+                    ></path>
+                </svg>
+            </StatCard>
+
+            <StatCard
+                label="Total Clicks (All Time)"
+                value={totalClicks.toLocaleString()}
+                accent="pink"
+            >
+                <svg
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    viewBox="0 0 24 24"
+                    class="w-5 h-5"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zm-7.518-.267A8.25 8.25 0 1120.25 10.5M8.288 14.212A5.25 5.25 0 1117.25 10.5"
+                    ></path>
+                </svg>
+            </StatCard>
+
+            <StatCard
+                label="Top Performing Link"
+                value={topLink ? topLink.alias : "—"}
+                sub={topLink ? `${topLink.click_count} clicks` : "No links yet"}
+                accent="cyan"
+            >
+                <svg
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    viewBox="0 0 24 24"
+                    class="w-5 h-5"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 002.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 012.916.52 6.003 6.003 0 01-5.395 4.972m0 0a6.726 6.726 0 01-2.749 1.35m0 0a6.772 6.772 0 01-3.044 0"
+                    ></path>
+                </svg>
+            </StatCard>
+        </div>
+
+        <!-- Recent Links -->
+        <section class="space-y-4">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-bold text-clean">Recent Links</h2>
+                {
+                    links.length > 0 && (
+                        <span class="text-xs text-muted">
+                            {totalLinks} link{totalLinks !== 1 ? "s" : ""} total
+                        </span>
+                    )
+                }
+            </div>
+            <LinksTable links={links} baseUrl={baseUrl} />
+        </section>
+    </main>
+</Layout>

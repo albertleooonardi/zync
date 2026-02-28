@@ -1,0 +1,70 @@
+---
+interface Props {
+    /** The user's email or display name */
+    userEmail?: string;
+}
+
+const { userEmail } = Astro.props;
+
+// First letter of the email for the avatar
+const initial = userEmail ? userEmail[0].toUpperCase() : "?";
+---
+
+<nav
+    class="sticky top-0 z-40 w-full border-b border-white/5 bg-midnight/80 backdrop-blur-xl"
+>
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="flex h-16 items-center justify-between">
+            <!-- Logo -->
+            <a
+                href="/"
+                class="text-2xl font-black bg-gradient-to-r from-cyan to-pink bg-clip-text text-transparent hover:opacity-80 transition-opacity"
+            >
+                Zync
+            </a>
+
+            <!-- Right side -->
+            <div class="flex items-center gap-3">
+                <!-- User avatar -->
+                {
+                    userEmail && (
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan to-pink flex items-center justify-center text-midnight text-sm font-bold select-none">
+                                {initial}
+                            </div>
+                            <span class="hidden sm:block text-sm text-muted truncate max-w-[180px]">
+                                {userEmail}
+                            </span>
+                        </div>
+                    )
+                }
+
+                <!-- Divider -->
+                <div class="w-px h-5 bg-white/10"></div>
+
+                <!-- Logout -->
+                <form method="POST" action="/api/logout">
+                    <button
+                        type="submit"
+                        class="flex items-center gap-1.5 text-sm text-muted hover:text-red-400 transition-colors duration-150"
+                    >
+                        <svg
+                            class="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                            ></path>
+                        </svg>
+                        Logout
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</nav>

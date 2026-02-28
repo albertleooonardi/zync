@@ -1,0 +1,42 @@
+---
+interface Props {
+    label: string;
+    value: string | number;
+    /** Optional sub-label shown under the value */
+    sub?: string;
+    accent?: "cyan" | "pink" | "default";
+}
+
+const { label, value, sub, accent = "default" } = Astro.props;
+
+const accentColor = {
+    cyan: "text-cyan",
+    pink: "text-pink",
+    default: "text-clean",
+}[accent];
+
+const iconBg = {
+    cyan: "bg-cyan/10 border-cyan/20 text-cyan",
+    pink: "bg-pink/10 border-pink/20 text-pink",
+    default: "bg-white/5 border-white/10 text-muted",
+}[accent];
+---
+
+<div
+    class="rounded-2xl bg-river border border-white/5 p-5 flex items-start gap-4 hover:border-white/10 transition-colors duration-200"
+>
+    <div
+        class={`flex-shrink-0 w-11 h-11 rounded-xl border flex items-center justify-center ${iconBg}`}
+    >
+        <slot />
+    </div>
+    <div class="min-w-0">
+        <p class="text-xs text-muted font-medium uppercase tracking-wider">
+            {label}
+        </p>
+        <p class={`text-2xl font-black mt-0.5 ${accentColor} truncate`}>
+            {value}
+        </p>
+        {sub && <p class="text-xs text-muted/60 mt-0.5 truncate">{sub}</p>}
+    </div>
+</div>

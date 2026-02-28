@@ -1,0 +1,69 @@
+---
+interface Props {
+    /** <label> text */
+    label: string;
+    /** input id / name */
+    id: string;
+    /** input type, e.g. "email" | "password" | "text" */
+    type?:
+        | "text"
+        | "email"
+        | "password"
+        | "number"
+        | "tel"
+        | "url"
+        | "search"
+        | "date"
+        | "time"
+        | "datetime-local"
+        | "month"
+        | "week"
+        | "color"
+        | "file"
+        | "hidden"
+        | "checkbox"
+        | "radio"
+        | "range"
+        | "reset"
+        | "submit"
+        | "button"
+        | "image";
+    /** autocomplete hint */
+    autocomplete?: string;
+    /** placeholder text */
+    placeholder?: string;
+    /** Optional helper shown below the input */
+    hint?: string;
+    /** Optional slot-like label suffix (e.g. "Forgot password?" link) — pass raw HTML via prop */
+    labelSuffix?: string;
+}
+
+const {
+    label,
+    id,
+    type = "text",
+    autocomplete,
+    placeholder,
+    hint,
+    labelSuffix,
+} = Astro.props;
+---
+
+<div class="space-y-1.5">
+    <div class="flex items-center justify-between">
+        <label for={id} class="block text-sm font-medium text-clean"
+            >{label}</label
+        >
+        {labelSuffix && <Fragment set:html={labelSuffix} />}
+    </div>
+    <input
+        id={id}
+        name={id}
+        type={type}
+        required
+        autocomplete={autocomplete}
+        placeholder={placeholder}
+        class="w-full px-4 py-3 rounded-xl bg-river border border-white/10 text-clean placeholder:text-muted/50 text-sm outline-none focus:border-cyan/60 focus:ring-2 focus:ring-cyan/20 transition-all duration-200"
+    />
+    {hint && <p class="text-xs text-muted/60 mt-1">{hint}</p>}
+</div>
