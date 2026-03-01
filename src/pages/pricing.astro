@@ -18,6 +18,12 @@ const DashIcon = `
 ---
 
 <Layout title="Pricing — Zync" description="Choose the perfect plan for your personal brand or business.">
+    <!-- Midtrans Snap JS -->
+    <script is:inline type="text/javascript"
+        src="https://app.sandbox.midtrans.com/snap/snap.js"
+        data-client-key={import.meta.env.PUBLIC_MIDTRANS_CLIENT_KEY || 'SB-Mid-client-XXXXX'}>
+    </script>
+    
     <Navbar />
 
     <main class="min-h-screen pt-24 pb-20 bg-[#0B0F19]">
@@ -57,7 +63,8 @@ const DashIcon = `
                 <div class="bg-[#1E293B] rounded-3xl p-8 border border-white/5 flex flex-col items-center text-center shadow-xl">
                     <h3 class="text-xl font-bold text-[#F8FAFC] mb-2">Hobby</h3>
                     <div class="flex items-baseline gap-1 my-4">
-                        <span class="text-4xl font-black text-[#F8FAFC]">$0</span>
+                        <span class="text-2xl font-bold text-[#94A3B8]">Rp</span>
+                        <span class="text-4xl font-black text-[#F8FAFC]">0</span>
                         <span class="text-[#94A3B8] text-sm">/mo</span>
                     </div>
                     <p class="text-sm text-[#94A3B8] mb-8">Perfect for getting started.</p>
@@ -81,7 +88,8 @@ const DashIcon = `
                     
                     <h3 class="text-xl font-bold text-[#06B6D4] mb-2 pt-2">Creator</h3>
                     <div class="flex items-baseline gap-1 my-4">
-                        <span class="text-5xl font-black text-[#F8FAFC]">$9</span>
+                        <span class="text-2xl font-bold text-[#94A3B8]">Rp</span>
+                        <span class="text-5xl font-black text-[#F8FAFC]">99<span class="text-3xl">.000</span></span>
                         <span class="text-[#94A3B8] text-sm">/mo</span>
                     </div>
                     <p class="text-sm text-[#94A3B8] mb-8">For growing creators and brands.</p>
@@ -94,16 +102,17 @@ const DashIcon = `
                         <li class="flex items-center gap-3"><Fragment set:html={CheckIcon} /> <span class="flex-1">1 Custom Domain</span></li>
                     </ul>
 
-                    <a href="/signup" class="w-full py-3 rounded-xl bg-[#06B6D4] text-[#0B0F19] text-sm font-bold hover:bg-[#06B6D4]/90 transition-colors mt-auto shadow-md">
-                        Start 14-Day Free Trial
-                    </a>
+                    <button data-plan="creator" class="checkout-btn w-full py-3 rounded-xl bg-[#06B6D4] text-[#0B0F19] text-sm font-bold hover:bg-[#06B6D4]/90 transition-colors mt-auto shadow-md">
+                        Start Creator Plan
+                    </button>
                 </div>
 
                 <!-- Card 3: Business -->
                 <div class="bg-[#1E293B] rounded-3xl p-8 border border-white/5 flex flex-col items-center text-center shadow-xl">
                     <h3 class="text-xl font-bold text-[#F8FAFC] mb-2">Business</h3>
                     <div class="flex items-baseline gap-1 my-4">
-                        <span class="text-4xl font-black text-[#F8FAFC]">$29</span>
+                        <span class="text-2xl font-bold text-[#94A3B8]">Rp</span>
+                        <span class="text-4xl font-black text-[#F8FAFC]">299<span class="text-2xl">.000</span></span>
                         <span class="text-[#94A3B8] text-sm">/mo</span>
                     </div>
                     <p class="text-sm text-[#94A3B8] mb-8">For advanced teams and businesses.</p>
@@ -115,9 +124,9 @@ const DashIcon = `
                         <li class="flex items-center gap-3"><Fragment set:html={CheckIcon} /> <span class="flex-1">Multiple custom domains</span></li>
                     </ul>
 
-                    <a href="/signup" class="w-full py-3 rounded-xl border border-white/10 text-sm font-semibold text-[#F8FAFC] hover:bg-white/5 transition-colors mt-auto">
-                        Contact Sales
-                    </a>
+                    <button data-plan="business" class="checkout-btn w-full py-3 rounded-xl border border-white/10 text-sm font-semibold text-[#F8FAFC] hover:bg-white/5 transition-colors mt-auto">
+                        Start Business Plan
+                    </button>
                 </div>
 
             </div>
@@ -268,4 +277,77 @@ const DashIcon = `
 
     </main>
     <Footer />
+    
+    <script>
+        declare global {
+            interface Window {
+                snap: any;
+            }
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            const checkoutBtns = document.querySelectorAll('.checkout-btn');
+            
+            checkoutBtns.forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const button = e.currentTarget as HTMLButtonElement;
+                    const plan = button.getAttribute('data-plan');
+                    const originalText = button.innerText;
+                    
+                    try {
+                        // Show loading state
+                        button.innerText = 'Loading secure checkout...';
+                        button.disabled = true;
+                        
+                        // Call our backend API to generate a transaction token
+                        const response = await fetch('/api/checkout', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ plan })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (!response.ok) {
+                            throw new Error(data.error || 'Checkout failed');
+                        }
+                        
+                        // Ensure Midtrans snap SDK is loaded
+                        if (typeof window.snap === 'undefined') {
+                            throw new Error('Midtrans payment script failed to load. Please disable adblock and refresh.');
+                        }
+                        
+                        // Trigger Snap popup
+                        window.snap.pay(data.token, {
+                            onSuccess: function(result: any) {
+                                console.log('Payment success!', result);
+                                alert("Payment successful! Zync will be upgraded momentarily.");
+                                window.location.href = "/dashboard";
+                            },
+                            onPending: function(result: any) {
+                                console.log('Payment pending', result);
+                                alert("Waiting for your payment!");
+                            },
+                            onError: function(result: any) {
+                                console.error('Payment error', result);
+                                alert("Payment failed. Please try again.");
+                            },
+                            onClose: function() {
+                                console.log('customer closed the popup without finishing the payment');
+                            }
+                        });
+                        
+                    } catch (error: any) {
+                        console.error('Checkout error:', error);
+                        alert(error.message || "An error occurred during checkout setup.");
+                    } finally {
+                        // Restore button state
+                        button.innerText = originalText;
+                        button.disabled = false;
+                    }
+                });
+            });
+        });
+    </script>
 </Layout>

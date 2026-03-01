@@ -1,0 +1,96 @@
+---
+import { createClient } from "@supabase/supabase-js";
+import midtransClient from "midtrans-client";
+
+// Initialize Supabase Admin strictly for backend API
+const supabase = createClient(
+    import.meta.env.PUBLIC_SUPABASE_URL || "",
+    import.meta.env.SUPABASE_SERVICE_ROLE_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY || ""
+);
+
+// Only allow POST requests for checkout
+if (Astro.request.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+        status: 405,
+        headers: { "Content-Type": "application/json" }
+    });
+}
+
+try {
+    const { plan } = await Astro.request.json();
+
+    if (!plan || (plan !== "creator" && plan !== "business")) {
+        return new Response(JSON.stringify({ error: "Invalid plan selected" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+        });
+    }
+
+    // Determine price based on plan
+    const gross_amount = plan === "creator" ? 99000 : 299000;
+
+    // Check Authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    // If not logged in, we can either return an error or allow guest checkout. 
+    // Usually for SaaS, require login first. For now, we'll allow an anonymous identifier if no user.
+    const userId = user?.id || `guest-${Date.now()}`;
+    const email = user?.email || "guest@example.com";
+    const firstName = user?.user_metadata?.first_name || "Zync";
+    const lastName = user?.user_metadata?.last_name || "User";
+
+    // Initialize Snap API
+    const snap = new midtransClient.Snap({
+        isProduction: false,
+        serverKey: import.meta.env.MIDTRANS_SERVER_KEY || 'SB-Mid-server-XXXXX',
+        clientKey: import.meta.env.PUBLIC_MIDTRANS_CLIENT_KEY || 'SB-Mid-client-XXXXX'
+    });
+
+    // Create unique order ID
+    const orderId = `zync-${plan}-${userId.substring(0,8)}-${Date.now()}`;
+
+    // Transaction Details
+    const parameter = {
+        transaction_details: {
+            order_id: orderId,
+            gross_amount: gross_amount
+        },
+        item_details: [{
+            id: `plan-${plan}`,
+            price: gross_amount,
+            quantity: 1,
+            name: `Zync ${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan (1 Month)`
+        }],
+        customer_details: {
+            first_name: firstName,
+            last_name: lastName,
+            email: email
+        },
+        // Custom field to pass the user ID and plan for the webhook to parse later
+        custom_field1: userId,
+        custom_field2: plan
+    };
+
+    // Create transaction token
+    const transaction = await snap.createTransaction(parameter);
+
+    return new Response(JSON.stringify({ 
+        token: transaction.token,
+        redirect_url: transaction.redirect_url,
+        order_id: orderId
+    }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+    });
+
+} catch (error: any) {
+    console.error("Checkout Error:", error);
+    return new Response(JSON.stringify({ 
+        error: "Failed to create transaction", 
+        details: error.message 
+    }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+    });
+}
+---
