@@ -1,0 +1,221 @@
+---
+// ── Zync short-link redirect handler ──────────────────────────────────────────
+// Handles ALL smart routing features:
+//   • Meta-Tag preview page (og: tags for social sharing)
+//   • A/B routing (random split between two URLs)
+//   • Time-based routing (different URL by time of day)
+//   • Deep linking (app scheme for mobile)
+//   • Click recording (referrer, country, device)
+
+import { createSupabaseAdminClient } from "../lib/supabase";
+
+const { alias } = Astro.params;
+if (!alias) return Astro.redirect("/");
+
+// ── Look up alias ──────────────────────────────────────────────────────────────
+const admin = createSupabaseAdminClient();
+const { data: link, error } = await admin
+    .from("links")
+    .select(
+        "id, original_url, og_title, og_description, og_image, ab_url_b, ab_weight, time_rules"
+    )
+    .eq("alias", alias)
+    .single();
+
+if (error || !link) {
+    return new Response(
+        `<!DOCTYPE html><html><head><title>Link not found — Zync</title></head>
+<body style="font-family:sans-serif;display:flex;height:100vh;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:#0B0F19;color:#94A3B8">
+<p style="font-size:2rem">🔗</p>
+<p style="font-size:1.1rem;color:#f8fafc">Link not found</p>
+<p>This short link doesn't exist or has been removed.</p>
+<a href="/" style="color:#06B6D4">← Back to Zync</a>
+</body></html>`,
+        { status: 404, headers: { "Content-Type": "text/html" } }
+    );
+}
+
+// ── Determine destination URL ─────────────────────────────────────────────────
+const request = Astro.request;
+const headers = request.headers;
+const ua = headers.get("user-agent") ?? "";
+
+function detectDevice(userAgent: string): string {
+    const u = userAgent.toLowerCase();
+    if (/ipad|tablet|(android(?!.*mobile))/.test(u)) return "tablet";
+    if (/mobile|android|iphone|ipod|blackberry|opera mini|iemobile/.test(u)) return "mobile";
+    return "desktop";
+}
+
+const device = detectDevice(ua);
+const isMobile = device === "mobile" || device === "tablet";
+
+// 1. Time-based routing — check time rules first
+function resolveTimeUrl(rules: Array<{ from: string; to: string; tz: string; url: string }> | null): string | null {
+    if (!rules || rules.length === 0) return null;
+    for (const rule of rules) {
+        try {
+            const tz = rule.tz || "UTC";
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString("en-US", {
+                hour12: false,
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: tz,
+            });
+            if (timeStr >= rule.from && timeStr <= rule.to) {
+                return rule.url;
+            }
+        } catch {
+            continue;
+        }
+    }
+    return null;
+}
+
+const timeUrl = resolveTimeUrl(link.time_rules as any);
+let destinationUrl = timeUrl ?? link.original_url;
+
+// 2. A/B routing — only if no time rule matched and ab_url_b is set
+if (!timeUrl && link.ab_url_b) {
+    const weight = link.ab_weight ?? 50;
+    destinationUrl = Math.random() * 100 < weight ? link.original_url : link.ab_url_b;
+}
+
+// ── Record click ───────────────────────────────────────────────────────────────
+const referrer = headers.get("referer") ?? null;
+const country =
+    headers.get("cf-ipcountry") ??
+    headers.get("x-vercel-ip-country") ??
+    null;
+
+await admin.from("clicks").insert({
+    link_id: link.id,
+    referrer,
+    country,
+    user_agent: ua,
+    device,
+});
+
+// ── Deep linking — detect known apps (mobile only) ────────────────────────────
+function getAppScheme(url: string): string | null {
+    try {
+        const u = new URL(url);
+        const h = u.hostname.replace(/^www\./, "");
+
+        // YouTube
+        const ytMatch = url.match(/youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]+)/);
+        if (ytMatch) return `youtube://watch?v=${ytMatch[1]}`;
+        if (/youtube\.com\/shorts\/([a-zA-Z0-9_-]+)/.test(url))
+            return `youtube://shorts/${url.match(/shorts\/([a-zA-Z0-9_-]+)/)?.[1]}`;
+
+        // Instagram
+        const igPostMatch = url.match(/instagram\.com\/p\/([a-zA-Z0-9_-]+)/);
+        if (igPostMatch) return `instagram://media?id=${igPostMatch[1]}`;
+        const igUserMatch = url.match(/instagram\.com\/([a-zA-Z0-9._]+)\/?$/);
+        if (igUserMatch) return `instagram://user?username=${igUserMatch[1]}`;
+
+        // TikTok
+        const ttMatch = url.match(/tiktok\.com\/@[^/]+\/video\/(\d+)/);
+        if (ttMatch) return `tiktok://video?id=${ttMatch[1]}`;
+
+        // Spotify
+        const spMatch = url.match(/open\.spotify\.com\/(track|album|playlist|artist)\/([a-zA-Z0-9]+)/);
+        if (spMatch) return `spotify://${spMatch[1]}/${spMatch[2]}`;
+
+        // Twitter / X
+        const twUserMatch = url.match(/(?:twitter|x)\.com\/([a-zA-Z0-9_]+)(?:\/|$)/);
+        if (twUserMatch && twUserMatch[1] !== "i") return `twitter://user?screen_name=${twUserMatch[1]}`;
+    } catch {}
+    return null;
+}
+
+const appScheme = isMobile ? getAppScheme(destinationUrl) : null;
+
+// ── Meta props ────────────────────────────────────────────────────────────────
+const ogTitle       = link.og_title       ?? "";
+const ogDescription = link.og_description ?? "";
+const ogImage       = link.og_image       ?? "";
+const pageUrl       = Astro.url.href;
+
+// ── Is this a bot/crawler? → direct redirect (no JS) ─────────────────────────
+// Bots need the HTML to read og: tags; real visitors get instant redirect.
+// We serve the full HTML page for all requests — bots stop at og: tags,
+// visitors get instant JS redirect.
+---
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{ogTitle || "Zync Short Link"}</title>
+
+        <!-- og: meta tags for rich social previews -->
+        {ogTitle       && <meta property="og:title"       content={ogTitle} />}
+        {ogDescription && <meta property="og:description" content={ogDescription} />}
+        {ogImage       && <meta property="og:image"       content={ogImage} />}
+        <meta property="og:url"  content={pageUrl} />
+        <meta property="og:type" content="website" />
+
+        <!-- Twitter card -->
+        <meta name="twitter:card"  content={ogImage ? "summary_large_image" : "summary"} />
+        {ogTitle       && <meta name="twitter:title"       content={ogTitle} />}
+        {ogDescription && <meta name="twitter:description" content={ogDescription} />}
+        {ogImage       && <meta name="twitter:image"       content={ogImage} />}
+
+        <!-- Fallback meta refresh (works if JS is disabled) -->
+        <meta http-equiv="refresh" content={`0;url=${destinationUrl}`} />
+
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                background: #0B0F19;
+                color: #94A3B8;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                gap: 8px;
+            }
+            .spinner {
+                width: 32px; height: 32px;
+                border: 3px solid rgba(6,182,212,0.2);
+                border-top-color: #06B6D4;
+                border-radius: 50%;
+                animation: spin 0.7s linear infinite;
+            }
+            @keyframes spin { to { transform: rotate(360deg); } }
+            p { font-size: 0.85rem; }
+            a { color: #06B6D4; text-decoration: none; font-size: 0.8rem; margin-top: 4px; }
+        </style>
+    </head>
+    <body>
+        <div class="spinner"></div>
+        <p>Redirecting…</p>
+        <a href={destinationUrl}>Click here if not redirected</a>
+
+        <script
+            define:vars={{
+                destUrl: destinationUrl,
+                appUrl: appScheme,
+                isMobile,
+            }}
+        >
+            if (appUrl && isMobile) {
+                // Try to open the app, fall back to web URL after 2s
+                let opened = false;
+                window.addEventListener("blur", () => { opened = true; });
+                window.location.href = appUrl;
+                setTimeout(() => {
+                    if (!opened) window.location.href = destUrl;
+                }, 2000);
+            } else {
+                // Instant redirect
+                window.location.replace(destUrl);
+            }
+        </script>
+    </body>
+</html>

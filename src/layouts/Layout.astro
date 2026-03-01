@@ -1,5 +1,6 @@
 ---
 import "../styles/global.css";
+import NemoChat from "../components/NemoChat.astro";
 
 interface Props {
 	title?: string;
@@ -30,5 +31,6 @@ const {
 		class="bg-midnight text-clean font-sans antialiased selection:bg-cyan/30 selection:text-cyan"
 	>
 		<slot />
+		<NemoChat />
 	</body>
 </html>

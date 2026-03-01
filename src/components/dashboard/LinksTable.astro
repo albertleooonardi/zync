@@ -101,7 +101,10 @@ function truncate(str: string, n: number) {
                                     </span>
                                 </td>
                                 <td class="px-5 py-4 text-right">
-                                    <span class="text-clean font-bold tabular-nums">
+                                    <span
+                                        id={`clicks-${link.id}`}
+                                        class="text-clean font-bold tabular-nums transition-colors duration-300"
+                                    >
                                         {link.click_count ?? 0}
                                     </span>
                                 </td>
@@ -146,6 +149,25 @@ function truncate(str: string, n: number) {
                                                     stroke-linecap="round"
                                                     stroke-linejoin="round"
                                                     d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"
+                                                />
+                                            </svg>
+                                        </a>
+                                        <a
+                                            href={`/dashboard/edit/${link.id}`}
+                                            class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-muted hover:text-cyan hover:border-cyan/30 hover:bg-cyan/10 transition-all duration-150"
+                                            title="Edit link"
+                                        >
+                                            <svg
+                                                class="w-3.5 h-3.5"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
                                                 />
                                             </svg>
                                         </a>

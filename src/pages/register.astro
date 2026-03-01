@@ -1,49 +1,31 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import {
-    createSupabaseServerClient,
-    createSupabaseAdminClient,
-} from "../lib/supabase";
-import { sendVerificationEmail } from "../lib/email";
+import { createSupabaseServerClient } from "../lib/supabase";
 import AuthLeftPanel from "../components/auth/AuthLeftPanel.astro";
 import AuthErrorMessage from "../components/auth/AuthErrorMessage.astro";
 import AuthFormField from "../components/auth/AuthFormField.astro";
 
 let errorMessage = "";
+let successMessage = "";
 
 if (Astro.request.method === "POST") {
     const formData = await Astro.request.formData();
     const email = formData.get("email")?.toString() ?? "";
     const password = formData.get("password")?.toString() ?? "";
 
-    const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
-    const { error } = await supabase.auth.signUp({ email, password });
-
-    if (error) {
-        errorMessage = error.message;
+    if (password.length < 8) {
+        errorMessage = "Password must be at least 8 characters.";
     } else {
-        // Generate a random 6-digit OTP
-        const code = String(Math.floor(100000 + Math.random() * 900000));
+        const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
+        const { error } = await supabase.auth.signUp({ email, password });
 
-        // Store it in Supabase (admin client bypasses RLS)
-        const admin = createSupabaseAdminClient();
-        await admin.from("email_verifications").insert({
-            email,
-            code,
-            expires_at: new Date(Date.now() + 3 * 60 * 1000).toISOString(),
-        });
-
-        // Send the verification email
-        try {
-            await sendVerificationEmail(email, code);
-        } catch (emailErr) {
-            console.error("Email send failed:", emailErr);
-            // Don't block registration — user can try resending
+        if (error) {
+            errorMessage = error.message;
+        } else {
+            // Supabase sends its own confirmation email automatically.
+            successMessage =
+                "Account created! Check your inbox for a confirmation link, then sign in.";
         }
-
-        return Astro.redirect(
-            `/check-email?email=${encodeURIComponent(email)}`
-        );
     }
 }
 ---
@@ -64,11 +46,12 @@ if (Astro.request.method === "POST") {
         <!-- ── Left Panel ── -->
         <AuthLeftPanel accent="pink">
             <p class="text-xl font-semibold text-clean leading-snug">
-                One link to rule them all.<br />Start for free today.
+                One link to rule them all.<br />Be among the first to try Zync.
             </p>
             <p class="text-sm text-muted">
-                Join thousands of creators who use Zync to manage links, track
-                analytics, and grow their audience.
+                A smart link shortener with real-time analytics, AI-powered meta
+                tags, and deep linking — built for creators who care about
+                growth.
             </p>
 
             <!-- Feature checklist -->
@@ -79,7 +62,7 @@ if (Astro.request.method === "POST") {
                         "Real-time click analytics",
                         "AI-powered meta tags",
                         "Deep linking for apps",
-                        "Phishing shield — ML protected",
+                        "Custom domains",
                     ].map((feature) => (
                         <li class="flex items-center gap-3 text-sm text-muted">
                             <span class="flex-shrink-0 w-5 h-5 rounded-full bg-cyan/15 border border-cyan/30 flex items-center justify-center">
@@ -117,48 +100,73 @@ if (Astro.request.method === "POST") {
                     </p>
                 </div>
 
+                <!-- Success state -->
+                {
+                    successMessage && (
+                        <div class="flex items-start gap-3 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-400">
+                            <svg
+                                class="w-4 h-4 flex-shrink-0 mt-0.5"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                            >
+                                <path
+                                    fill-rule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                    clip-rule="evenodd"
+                                />
+                            </svg>
+                            <span>{successMessage}</span>
+                        </div>
+                    )
+                }
+
                 <AuthErrorMessage message={errorMessage} />
-                <!-- Register form -->
-                <form method="POST" class="space-y-4" novalidate>
-                    <AuthFormField
-                        id="email"
-                        label="Email"
-                        type="email"
-                        autocomplete="email"
-                        placeholder="you@example.com"
-                    />
 
-                    <AuthFormField
-                        id="password"
-                        label="Password"
-                        type="password"
-                        autocomplete="new-password"
-                        placeholder="••••••••"
-                        hint="Minimum 8 characters."
-                    />
+                <!-- Register form — hide once successful -->
+                {
+                    !successMessage && (
+                        <form method="POST" class="space-y-4" novalidate>
+                            <AuthFormField
+                                id="email"
+                                label="Email"
+                                type="email"
+                                autocomplete="email"
+                                placeholder="you@example.com"
+                            />
 
-                    <button
-                        type="submit"
-                        class="w-full py-3.5 bg-cyan hover:bg-cyan/90 text-midnight font-bold rounded-xl text-sm transition-all duration-150 active:scale-[0.98] shadow-[0_0_20px_rgba(6,182,212,0.35)] hover:shadow-[0_0_32px_rgba(6,182,212,0.55)] mt-2"
-                    >
-                        Create Account — It's Free
-                    </button>
+                            <AuthFormField
+                                id="password"
+                                label="Password"
+                                type="password"
+                                autocomplete="new-password"
+                                placeholder="••••••••"
+                                hint="Minimum 8 characters."
+                            />
 
-                    <p class="text-xs text-center text-muted/60 pt-1">
-                        By signing up you agree to our
-                        <a
-                            href="/terms"
-                            class="underline hover:text-clean transition-colors"
-                            >Terms</a
-                        >
-                        and
-                        <a
-                            href="/privacy"
-                            class="underline hover:text-clean transition-colors"
-                            >Privacy Policy</a
-                        >.
-                    </p>
-                </form>
+                            <button
+                                type="submit"
+                                class="w-full py-3.5 bg-cyan hover:bg-cyan/90 text-midnight font-bold rounded-xl text-sm transition-all duration-150 active:scale-[0.98] shadow-[0_0_20px_rgba(6,182,212,0.35)] hover:shadow-[0_0_32px_rgba(6,182,212,0.55)] mt-2"
+                            >
+                                Create Account — It's Free
+                            </button>
+
+                            <p class="text-xs text-center text-muted/60 pt-1">
+                                By signing up you agree to our
+                                <a
+                                    href="/terms"
+                                    class="underline hover:text-clean transition-colors"
+                                >Terms</a
+                                >
+                                and
+                                <a
+                                    href="/privacy"
+                                    class="underline hover:text-clean transition-colors"
+                                >Privacy Policy</a
+                                >.
+                            </p>
+                        </form>
+                    )
+                }
 
                 <!-- Toggle link -->
                 <p class="text-center text-sm text-muted">

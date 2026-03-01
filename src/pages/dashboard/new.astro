@@ -2,17 +2,13 @@
 import Layout from "../../layouts/Layout.astro";
 import { createSupabaseServerClient } from "../../lib/supabase";
 import DashboardNav from "../../components/dashboard/DashboardNav.astro";
+import BackButton from "../../components/ui/BackButton.astro";
+import { checkUrl } from "../../lib/phishing";
 
-// ── Auth guard ────────────────────────────────────────────────────────────────
+// ── Auth ──────────────────────────────────────────────────────────────────────
 const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
-const {
-    data: { session },
-} = await supabase.auth.getSession();
-
-if (!session) {
-    return Astro.redirect("/login");
-}
-
+const { data: { session } } = await supabase.auth.getSession();
+if (!session) return Astro.redirect("/login");
 const user = session.user;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -43,46 +39,66 @@ const suggestedAlias = randomAlias();
 if (Astro.request.method === "POST") {
     const formData = await Astro.request.formData();
     const originalUrl = formData.get("original_url")?.toString().trim() ?? "";
-    const rawAlias = formData.get("alias")?.toString().trim() ?? "";
-    const alias = rawAlias || randomAlias();
+    const rawAlias    = formData.get("alias")?.toString().trim() ?? "";
+    const finalAlias  = rawAlias || suggestedAlias;
+
+    // Smart feature fields
+    const ogTitle       = formData.get("og_title")?.toString().trim() || null;
+    const ogDescription = formData.get("og_description")?.toString().trim() || null;
+    const ogImage       = formData.get("og_image")?.toString().trim() || null;
+    const abUrlB        = formData.get("ab_url_b")?.toString().trim() || null;
+    const abWeight      = parseInt(formData.get("ab_weight")?.toString() ?? "50", 10);
+    const timeRulesRaw  = formData.get("time_rules")?.toString().trim() || null;
+    let timeRules = null;
+    if (timeRulesRaw) {
+        try { timeRules = JSON.parse(timeRulesRaw); } catch { /* ignore invalid JSON */ }
+    }
 
     formValues = { original_url: originalUrl, alias: rawAlias };
 
-    // Validate
+    // ── Validate
     if (!originalUrl) {
         fieldErrors.original_url = "Please enter a destination URL.";
     } else if (!isValidUrl(originalUrl)) {
         fieldErrors.original_url =
             "Must be a valid URL starting with http:// or https://";
     }
-
     if (rawAlias && !/^[a-zA-Z0-9_-]{2,50}$/.test(rawAlias)) {
         fieldErrors.alias =
             "Only letters, numbers, hyphens and underscores (2–50 chars).";
     }
 
     if (Object.keys(fieldErrors).length === 0) {
-        // Check alias uniqueness
-        const { data: existing } = await supabase
-            .from("links")
-            .select("id")
-            .eq("alias", alias)
-            .maybeSingle();
+        // ── Phishing Shield ──────────────────────────────────────────────────
+        const safety = await checkUrl(originalUrl);
+        if (!safety.safe) {
+            fieldErrors.original_url = `🛡️ Blocked: ${safety.reason}`;
+        }
+    }
 
-        if (existing) {
-            fieldErrors.alias = `"${alias}" is already taken. Try a different alias.`;
-        } else {
-            const { error: insertError } = await supabase
-                .from("links")
-                .insert({ user_id: user.id, alias, original_url: originalUrl });
+    if (Object.keys(fieldErrors).length === 0) {
+        const { error: dbError } = await supabase.from("links").insert({
+            user_id:        user.id,
+            alias:          finalAlias,
+            original_url:   originalUrl,
+            og_title:       ogTitle,
+            og_description: ogDescription,
+            og_image:       ogImage,
+            ab_url_b:       abUrlB,
+            ab_weight:      abWeight,
+            time_rules:     timeRules,
+        });
 
-            if (insertError) {
-                errorMessage = "Something went wrong. Please try again.";
+        if (dbError) {
+            // Postgres unique violation on alias
+            if (dbError.code === "23505") {
+                fieldErrors.alias =
+                    "That alias is already taken. Try a different one.";
             } else {
-                return Astro.redirect(
-                    "/dashboard?created=" + encodeURIComponent(alias)
-                );
+                errorMessage = dbError.message;
             }
+        } else {
+            return Astro.redirect(`/dashboard?created=${encodeURIComponent(finalAlias)}`);
         }
     }
 }
@@ -94,24 +110,7 @@ if (Astro.request.method === "POST") {
     <main class="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8 py-12 space-y-8">
         <!-- Header -->
         <div class="space-y-1">
-            <a
-                href="/dashboard"
-                class="inline-flex items-center gap-1.5 text-sm text-muted hover:text-clean transition-colors mb-3"
-            >
-                <svg
-                    class="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M15 19l-7-7 7-7"></path>
-                </svg>
-                Back to Dashboard
-            </a>
+            <BackButton href="/dashboard" label="Back to Dashboard" />
             <h1 class="text-3xl font-black text-clean">✨ Create New Zync</h1>
             <p class="text-sm text-muted">
                 Shorten a URL and start tracking clicks instantly.
@@ -266,30 +265,109 @@ if (Astro.request.method === "POST") {
                     </div>
                 </div>
 
+                <!-- ── Smart Features divider ─────────────────────────────── -->
+                <div class="border-t border-white/5 pt-4 space-y-3">
+                    <p class="text-xs text-muted/70 uppercase tracking-widest font-semibold">Smart Features</p>
+
+                    <!-- Meta-Tag Optimizer -->
+                    <div class="rounded-xl border border-white/5 overflow-hidden">
+                        <button type="button" id="toggle-meta" class="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-clean hover:bg-white/5 transition-colors duration-150 text-left">
+                            <span class="flex items-center gap-2">
+                                <span>🤖</span> Meta-Tag Optimizer
+                                <span class="text-xs text-muted font-normal">(Rich preview for WhatsApp, Twitter)</span>
+                            </span>
+                            <svg id="meta-chevron" class="w-4 h-4 text-muted transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div id="meta-panel" class="hidden px-4 pb-4 space-y-3 border-t border-white/5">
+                            <div class="flex gap-2 pt-3">
+                                <button type="button" id="fetch-meta-btn" class="flex-1 py-2 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold text-muted hover:text-clean hover:border-white/20 transition-all duration-150">
+                                    ⬇ Fetch from URL
+                                </button>
+                                <button type="button" id="ai-improve-btn" class="flex-1 py-2 rounded-lg bg-cyan/10 border border-cyan/20 text-xs font-semibold text-cyan hover:bg-cyan/20 transition-all duration-150">
+                                    ✨ AI Improve
+                                </button>
+                            </div>
+                            <p id="meta-status" class="text-xs text-muted hidden"></p>
+                            <div class="space-y-2">
+                                <div>
+                                    <label class="text-xs text-muted mb-1 block">Title <span class="text-muted/50">(max 60 chars)</span></label>
+                                    <input id="og-title" name="og_title" type="text" maxlength="80" placeholder="Auto-generated from destination URL"
+                                        class="w-full px-3 py-2 rounded-lg bg-midnight border border-white/10 text-clean placeholder:text-muted/30 text-sm outline-none focus:border-cyan/50 focus:ring-1 focus:ring-cyan/20 transition-all" />
+                                </div>
+                                <div>
+                                    <label class="text-xs text-muted mb-1 block">Description <span class="text-muted/50">(max 155 chars)</span></label>
+                                    <textarea id="og-description" name="og_description" rows="2" maxlength="200" placeholder="Auto-generated from destination URL"
+                                        class="w-full px-3 py-2 rounded-lg bg-midnight border border-white/10 text-clean placeholder:text-muted/30 text-sm outline-none focus:border-cyan/50 focus:ring-1 focus:ring-cyan/20 transition-all resize-none"></textarea>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-muted mb-1 block">Thumbnail Image URL</label>
+                                    <input id="og-image" name="og_image" type="url" placeholder="https://..."
+                                        class="w-full px-3 py-2 rounded-lg bg-midnight border border-white/10 text-clean placeholder:text-muted/30 text-sm outline-none focus:border-cyan/50 focus:ring-1 focus:ring-cyan/20 transition-all" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- A/B Routing -->
+                    <div class="rounded-xl border border-white/5 overflow-hidden">
+                        <button type="button" id="toggle-ab" class="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-clean hover:bg-white/5 transition-colors duration-150 text-left">
+                            <span class="flex items-center gap-2">
+                                <span>🔀</span> A/B Routing
+                                <span class="text-xs text-muted font-normal">(Split traffic between two URLs)</span>
+                            </span>
+                            <svg id="ab-chevron" class="w-4 h-4 text-muted transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div id="ab-panel" class="hidden px-4 pb-4 space-y-3 border-t border-white/5 pt-3">
+                            <div>
+                                <label class="text-xs text-muted mb-1 block">URL B (alternate destination)</label>
+                                <input id="ab-url-b" name="ab_url_b" type="url" placeholder="https://alternate-destination.com"
+                                    class="w-full px-3 py-2 rounded-lg bg-midnight border border-white/10 text-clean placeholder:text-muted/30 text-sm outline-none focus:border-cyan/50 focus:ring-1 focus:ring-cyan/20 transition-all" />
+                            </div>
+                            <div>
+                                <label class="text-xs text-muted mb-1 block">Traffic to URL A: <span id="ab-weight-label" class="text-cyan font-semibold">50%</span></label>
+                                <input id="ab-weight" name="ab_weight" type="range" min="10" max="90" value="50"
+                                    class="w-full accent-cyan" />
+                                <div class="flex justify-between text-xs text-muted/50 mt-0.5">
+                                    <span>URL A</span><span>URL B</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Time-Based Redirects -->
+                    <div class="rounded-xl border border-white/5 overflow-hidden">
+                        <button type="button" id="toggle-time" class="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-clean hover:bg-white/5 transition-colors duration-150 text-left">
+                            <span class="flex items-center gap-2">
+                                <span>⏰</span> Time-Based Redirects
+                                <span class="text-xs text-muted font-normal">(Different URL by time of day)</span>
+                            </span>
+                            <svg id="time-chevron" class="w-4 h-4 text-muted transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div id="time-panel" class="hidden px-4 pb-4 border-t border-white/5 pt-3 space-y-3">
+                            <div id="time-rules-list" class="space-y-2"></div>
+                            <input type="hidden" id="time-rules-json" name="time_rules" value="" />
+                            <button type="button" id="add-time-rule" class="w-full py-2 rounded-lg border border-dashed border-white/10 text-xs text-muted hover:border-cyan/30 hover:text-cyan transition-all duration-150">
+                                + Add time rule
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Submit -->
                 <button
                     id="submit-btn"
                     type="submit"
                     class="w-full py-3.5 bg-cyan hover:bg-cyan/90 text-midnight font-bold rounded-xl text-sm transition-all duration-150 active:scale-[0.98] shadow-[0_0_20px_rgba(6,182,212,0.35)] hover:shadow-[0_0_32px_rgba(6,182,212,0.55)] flex items-center justify-center gap-2"
                 >
-                    <svg
-                        class="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2.5"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"
-                        ></path>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"></path>
                     </svg>
                     Create Zync Link
                 </button>
             </form>
         </div>
     </main>
+
 
     <!-- Live alias preview + submit loading state -->
     <script define:vars={{ suggestedAlias }}>
@@ -298,22 +376,134 @@ if (Astro.request.method === "POST") {
         const form = document.getElementById("new-link-form");
         const submitBtn = document.getElementById("submit-btn");
 
-        // Update preview as user types alias
         aliasInput?.addEventListener("input", () => {
-            previewAlias.textContent =
-                aliasInput.value.trim() || suggestedAlias;
+            previewAlias.textContent = aliasInput.value.trim() || suggestedAlias;
         });
 
-        // Show loading state on submit
         form?.addEventListener("submit", () => {
             submitBtn.disabled = true;
-            submitBtn.innerHTML = `
-                <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-                Creating…
-            `;
+            submitBtn.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Creating…`;
+        });
+    </script>
+
+    <!-- Smart features interactivity -->
+    <script is:inline>
+        // ── Collapsible panels ─────────────────────────────────────────────────
+        function setupToggle(btnId, panelId, chevronId) {
+            const btn = document.getElementById(btnId);
+            const panel = document.getElementById(panelId);
+            const chevron = document.getElementById(chevronId);
+            btn?.addEventListener("click", () => {
+                const open = !panel.classList.contains("hidden");
+                panel.classList.toggle("hidden", open);
+                chevron?.classList.toggle("rotate-180", !open);
+            });
+        }
+        setupToggle("toggle-meta", "meta-panel", "meta-chevron");
+        setupToggle("toggle-ab", "ab-panel", "ab-chevron");
+        setupToggle("toggle-time", "time-panel", "time-chevron");
+
+        // ── A/B weight slider ──────────────────────────────────────────────────
+        const weightSlider = document.getElementById("ab-weight");
+        const weightLabel = document.getElementById("ab-weight-label");
+        weightSlider?.addEventListener("input", () => {
+            weightLabel.textContent = weightSlider.value + "%";
+        });
+
+        // ── Meta-tag fetch ─────────────────────────────────────────────────────
+        const urlInput = document.getElementById("original_url");
+        const metaStatus = document.getElementById("meta-status");
+
+        function setMetaStatus(msg, loading = false) {
+            metaStatus.textContent = msg;
+            metaStatus.classList.remove("hidden");
+            metaStatus.className = `text-xs mt-1 ${loading ? "text-muted animate-pulse" : "text-muted"}`;
+        }
+
+        document.getElementById("fetch-meta-btn")?.addEventListener("click", async () => {
+            const url = urlInput?.value?.trim();
+            if (!url) { setMetaStatus("Enter a destination URL first."); return; }
+            setMetaStatus("Fetching preview…", true);
+            try {
+                const res = await fetch("/api/fetch-meta", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url }),
+                });
+                const data = await res.json();
+                if (data.error) { setMetaStatus("Error: " + data.error); return; }
+                document.getElementById("og-title").value = data.title ?? "";
+                document.getElementById("og-description").value = data.description ?? "";
+                document.getElementById("og-image").value = data.image ?? "";
+                setMetaStatus("✓ Preview fetched successfully.");
+            } catch {
+                setMetaStatus("Failed to fetch. Check the URL and try again.");
+            }
+        });
+
+        // ── Meta AI improve ────────────────────────────────────────────────────
+        document.getElementById("ai-improve-btn")?.addEventListener("click", async () => {
+            const url = urlInput?.value?.trim();
+            setMetaStatus("✨ AI is improving your meta tags…", true);
+            try {
+                const res = await fetch("/api/ai-meta", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        url,
+                        title: document.getElementById("og-title").value,
+                        description: document.getElementById("og-description").value,
+                    }),
+                });
+                const data = await res.json();
+                if (data.error) { setMetaStatus("AI error: " + data.error); return; }
+                if (data.title) document.getElementById("og-title").value = data.title;
+                if (data.description) document.getElementById("og-description").value = data.description;
+                setMetaStatus("✓ AI improved your meta tags!");
+            } catch {
+                setMetaStatus("AI request failed. Is Ollama running?");
+            }
+        });
+
+        // ── Time rules builder ─────────────────────────────────────────────────
+        const rulesList = document.getElementById("time-rules-list");
+        const rulesJson = document.getElementById("time-rules-json");
+        let rules = [];
+
+        function renderRules() {
+            rulesList.innerHTML = "";
+            rules.forEach((rule, i) => {
+                const div = document.createElement("div");
+                div.className = "grid grid-cols-[1fr_1fr_1fr_auto] gap-1.5 items-center";
+                div.innerHTML = `
+                    <input type="time" value="${rule.from}" class="px-2 py-1.5 rounded-lg bg-midnight border border-white/10 text-clean text-xs outline-none focus:border-cyan/50" placeholder="08:00" data-field="from" data-idx="${i}" />
+                    <input type="time" value="${rule.to}" class="px-2 py-1.5 rounded-lg bg-midnight border border-white/10 text-clean text-xs outline-none focus:border-cyan/50" placeholder="12:00" data-field="to" data-idx="${i}" />
+                    <input type="url" value="${rule.url}" class="px-2 py-1.5 rounded-lg bg-midnight border border-white/10 text-clean text-xs outline-none focus:border-cyan/50" placeholder="https://..." data-field="url" data-idx="${i}" />
+                    <button type="button" data-remove="${i}" class="w-6 h-6 flex items-center justify-center text-muted hover:text-red-400 transition-colors text-lg leading-none">×</button>
+                `;
+                rulesList.appendChild(div);
+            });
+            // Sync hidden field
+            rulesJson.value = rules.length > 0 ? JSON.stringify(rules) : "";
+            // Attach listeners
+            rulesList.querySelectorAll("input[data-field]").forEach((el) => {
+                el.addEventListener("input", () => {
+                    const idx = parseInt(el.dataset.idx);
+                    rules[idx][el.dataset.field] = el.value;
+                    rulesJson.value = rules.length > 0 ? JSON.stringify(rules) : "";
+                });
+            });
+            rulesList.querySelectorAll("button[data-remove]").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    rules.splice(parseInt(btn.dataset.remove), 1);
+                    renderRules();
+                });
+            });
+        }
+
+        document.getElementById("add-time-rule")?.addEventListener("click", () => {
+            rules.push({ from: "08:00", to: "12:00", tz: "Asia/Jakarta", url: "" });
+            renderRules();
         });
     </script>
 </Layout>

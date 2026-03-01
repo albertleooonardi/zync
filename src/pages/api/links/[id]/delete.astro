@@ -1,0 +1,28 @@
+---
+// DELETE /api/links/[id]/delete
+// Called via POST form submission from the edit page danger zone.
+import { createSupabaseServerClient } from "../../../../lib/supabase";
+
+if (Astro.request.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
+}
+
+const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
+const { data: { session } } = await supabase.auth.getSession();
+if (!session) return Astro.redirect("/login");
+
+const { id } = Astro.params;
+
+// Delete only if it belongs to the logged-in user (RLS also enforces this)
+const { error } = await supabase
+    .from("links")
+    .delete()
+    .eq("id", id!)
+    .eq("user_id", session.user.id);
+
+if (error) {
+    console.error("Delete link error:", error.message);
+}
+
+return Astro.redirect("/dashboard");
+---

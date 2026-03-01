@@ -1,0 +1,236 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import { createSupabaseServerClient } from "../../../lib/supabase";
+import DashboardNav from "../../../components/dashboard/DashboardNav.astro";
+import BackButton from "../../../components/ui/BackButton.astro";
+import { checkUrl } from "../../../lib/phishing";
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
+const { data: { session } } = await supabase.auth.getSession();
+if (!session) return Astro.redirect("/login");
+const user = session.user;
+
+// ── Fetch link ────────────────────────────────────────────────────────────────
+const { id } = Astro.params;
+const { data: link, error: fetchError } = await supabase
+    .from("links")
+    .select("id, alias, original_url")
+    .eq("id", id!)
+    .eq("user_id", user.id)
+    .single();
+
+// Not found or not owned by this user
+if (fetchError || !link) return Astro.redirect("/dashboard");
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function isValidUrl(str: string): boolean {
+    try {
+        const url = new URL(str);
+        return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+        return false;
+    }
+}
+
+// ── Form state ────────────────────────────────────────────────────────────────
+let fieldErrors: Record<string, string> = {};
+let formValues = { original_url: link.original_url, alias: link.alias };
+let successMessage = "";
+
+// ── POST handler ──────────────────────────────────────────────────────────────
+if (Astro.request.method === "POST") {
+    const formData   = await Astro.request.formData();
+    const newUrl     = formData.get("original_url")?.toString().trim() ?? "";
+    const newAlias   = formData.get("alias")?.toString().trim() ?? "";
+
+    formValues = { original_url: newUrl, alias: newAlias };
+
+    // Validate
+    if (!newUrl) {
+        fieldErrors.original_url = "Please enter a destination URL.";
+    } else if (!isValidUrl(newUrl)) {
+        fieldErrors.original_url = "Must start with http:// or https://";
+    }
+    if (!newAlias) {
+        fieldErrors.alias = "Alias cannot be empty.";
+    } else if (!/^[a-zA-Z0-9_-]{2,50}$/.test(newAlias)) {
+        fieldErrors.alias =
+            "Only letters, numbers, hyphens and underscores (2–50 chars).";
+    }
+
+    if (Object.keys(fieldErrors).length === 0) {
+        // ── Phishing Shield ──────────────────────────────────────────────────
+        const safety = await checkUrl(newUrl);
+        if (!safety.safe) {
+            fieldErrors.original_url = `🛡️ Blocked: ${safety.reason}`;
+        }
+    }
+
+    if (Object.keys(fieldErrors).length === 0) {
+        const { error: updateError } = await supabase
+            .from("links")
+            .update({ original_url: newUrl, alias: newAlias })
+            .eq("id", id!)
+            .eq("user_id", user.id);
+
+        if (updateError) {
+            if (updateError.code === "23505") {
+                fieldErrors.alias = "That alias is already taken.";
+            } else {
+                fieldErrors.original_url = updateError.message;
+            }
+        } else {
+            return Astro.redirect("/dashboard");
+        }
+    }
+}
+---
+
+<Layout
+    title={`Edit Link — ${link.alias} — Zync`}
+    description="Edit your Zync short link."
+>
+    <DashboardNav userEmail={user.email} />
+
+    <main class="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+        <!-- Header -->
+        <div class="space-y-1">
+            <BackButton href="/dashboard" label="Back to Dashboard" />
+            <h1 class="text-3xl font-black text-clean">Edit Link</h1>
+            <p class="text-sm text-muted">
+                Update the destination URL or alias for this short link.
+            </p>
+        </div>
+
+        <!-- Form card -->
+        <div class="rounded-2xl bg-river border border-white/5 p-7 space-y-6">
+            <form method="POST" class="space-y-6" novalidate>
+                <!-- Destination URL -->
+                <div class="space-y-1.5">
+                    <label
+                        for="original_url"
+                        class="block text-sm font-medium text-clean"
+                    >
+                        Destination URL <span class="text-red-400">*</span>
+                    </label>
+                    <div class="relative">
+                        <div
+                            class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4"
+                        >
+                            <svg
+                                class="w-4 h-4 text-muted"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                                ></path>
+                            </svg>
+                        </div>
+                        <input
+                            id="original_url"
+                            name="original_url"
+                            type="url"
+                            required
+                            value={formValues.original_url}
+                            placeholder="https://your-destination-url.com"
+                            class={`w-full pl-10 pr-4 py-3 rounded-xl bg-midnight border ${
+                                fieldErrors.original_url
+                                    ? "border-red-500/50 focus:ring-red-500/20"
+                                    : "border-white/10 focus:border-cyan/60 focus:ring-cyan/20"
+                            } text-clean placeholder:text-muted/40 text-sm outline-none focus:ring-2 transition-all duration-200`}
+                        />
+                    </div>
+                    {
+                        fieldErrors.original_url && (
+                            <p class="text-xs text-red-400 mt-1">
+                                {fieldErrors.original_url}
+                            </p>
+                        )
+                    }
+                </div>
+
+                <!-- Alias -->
+                <div class="space-y-1.5">
+                    <label
+                        for="alias"
+                        class="block text-sm font-medium text-clean"
+                    >
+                        Alias <span class="text-red-400">*</span>
+                    </label>
+                    <div
+                        class="flex items-center gap-0 rounded-xl bg-midnight border border-white/10 focus-within:border-cyan/60 focus-within:ring-2 focus-within:ring-cyan/20 transition-all duration-200 overflow-hidden"
+                    >
+                        <span
+                            class="flex-shrink-0 px-4 py-3 text-sm text-muted border-r border-white/10 bg-white/5 whitespace-nowrap select-none"
+                        >
+                            {Astro.url.host}/
+                        </span>
+                        <input
+                            id="alias"
+                            name="alias"
+                            type="text"
+                            required
+                            value={formValues.alias}
+                            maxlength="50"
+                            class="flex-1 px-4 py-3 bg-transparent text-clean placeholder:text-muted/40 text-sm outline-none"
+                        />
+                    </div>
+                    {
+                        fieldErrors.alias ? (
+                            <p class="text-xs text-red-400 mt-1">
+                                {fieldErrors.alias}
+                            </p>
+                        ) : (
+                            <p class="text-xs text-muted/60 mt-1">
+                                Changing the alias will break any existing links
+                                shared with the old one.
+                            </p>
+                        )
+                    }
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center gap-3 pt-2">
+                    <button
+                        type="submit"
+                        class="flex-1 py-3.5 bg-cyan hover:bg-cyan/90 text-midnight font-bold rounded-xl text-sm transition-all duration-150 active:scale-[0.98] shadow-[0_0_20px_rgba(6,182,212,0.3)]"
+                    >
+                        Save Changes
+                    </button>
+                    <a
+                        href="/dashboard"
+                        class="px-5 py-3.5 rounded-xl border border-white/10 text-sm text-muted font-semibold hover:text-clean hover:border-white/20 transition-all duration-150 whitespace-nowrap"
+                    >
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Danger zone — delete link -->
+        <div class="rounded-2xl border border-red-500/20 bg-red-500/5 p-5 space-y-3">
+            <div>
+                <h3 class="text-sm font-bold text-red-400">Danger Zone</h3>
+                <p class="text-xs text-muted mt-1">
+                    Permanently delete this link. All analytics data will be
+                    lost.
+                </p>
+            </div>
+            <form method="POST" action={`/api/links/${id}/delete`}>
+                <button
+                    type="submit"
+                    onclick="return confirm('Delete this link? All click data will be lost.')"
+                    class="px-5 py-2.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 text-sm font-semibold hover:bg-red-500/20 hover:border-red-500/30 transition-all duration-150"
+                >
+                    Delete Link
+                </button>
+            </form>
+        </div>
+    </main>
+</Layout>

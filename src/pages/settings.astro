@@ -1,0 +1,633 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { createSupabaseServerClient } from "../lib/supabase";
+import DashboardNav from "../components/dashboard/DashboardNav.astro";
+import SettingsSidebar from "../components/settings/SettingsSidebar.astro";
+import BackButton from "../components/ui/BackButton.astro";
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
+const { data: { session } } = await supabase.auth.getSession();
+if (!session) return Astro.redirect("/login");
+const user = session.user;
+
+// ── Form state ────────────────────────────────────────────────────────────────
+let profileSuccess = "";
+let profileError = "";
+let domainStatus: "idle" | "pending" | "verified" = "pending"; // mock
+let newApiKey = ""; // shown once after generation
+let apiKeyError = "";
+
+// Mock API keys for preview
+const mockApiKeys = [
+    {
+        id: "k1",
+        name: "n8n Automation",
+        prefix: "zync_4f2a",
+        created_at: "2026-02-10",
+        last_used: "2026-02-28",
+    },
+    {
+        id: "k2",
+        name: "Python Script",
+        prefix: "zync_8c1b",
+        created_at: "2026-02-20",
+        last_used: "2026-03-01",
+    },
+];
+
+// ── POST handler ──────────────────────────────────────────────────────────────
+if (Astro.request.method === "POST") {
+    const form = await Astro.request.formData();
+    const action = form.get("action")?.toString();
+
+    if (action === "update-profile") {
+        // const newPassword = form.get("password")?.toString();
+        // if (newPassword?.length >= 8) {
+        //     const { error } = await supabase.auth.updateUser({ password: newPassword });
+        //     profileError = error?.message ?? "";
+        //     if (!error) profileSuccess = "Password updated successfully.";
+        // } else {
+        //     profileError = "Password must be at least 8 characters.";
+        // }
+        profileSuccess =
+            "Password updated successfully. (Preview mode — no real change)";
+    }
+
+    if (action === "generate-api-key") {
+        // Real: generate a random token, hash it, store hash in DB, show token once
+        newApiKey =
+            "zync_" + crypto.randomUUID().replace(/-/g, "").slice(0, 32);
+    }
+}
+---
+
+<Layout
+    title="Settings — Zync"
+    description="Manage your Zync account settings."
+>
+    <DashboardNav userEmail={user.email} />
+
+    <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
+        <div class="flex flex-col lg:flex-row gap-10">
+            <!-- ── Sidebar ── -->
+            <aside class="lg:w-56 flex-shrink-0">
+                <div class="sticky top-24 space-y-6">
+                    <BackButton href="/dashboard" label="Back to Dashboard" />
+                    <div>
+                        <h1 class="text-xl font-black text-clean">Settings</h1>
+                        <p class="text-xs text-muted mt-0.5">
+                            Manage your account
+                        </p>
+                    </div>
+                    <SettingsSidebar />
+                </div>
+            </aside>
+
+            <!-- ── Main content ── -->
+            <main class="flex-1 space-y-10 min-w-0">
+                <!-- ──────────────────────────────────────────────────────── -->
+                <!-- SECTION 1: Account Profile                               -->
+                <!-- ──────────────────────────────────────────────────────── -->
+                <section id="account" class="scroll-mt-24 space-y-4">
+                    <div
+                        class="flex items-center gap-3 pb-2 border-b border-white/5"
+                    >
+                        <div
+                            class="w-8 h-8 rounded-lg bg-cyan/10 border border-cyan/20 flex items-center justify-center text-cyan"
+                        >
+                            <svg
+                                class="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+                                ></path>
+                            </svg>
+                        </div>
+                        <h2 class="text-base font-bold text-clean">
+                            Account Profile
+                        </h2>
+                    </div>
+
+                    <!-- Email (read-only) -->
+                    <div
+                        class="rounded-2xl bg-river border border-white/5 p-5 space-y-4"
+                    >
+                        <div class="space-y-1.5">
+                            <label
+                                class="block text-xs font-semibold text-muted uppercase tracking-wider"
+                                >Email Address</label
+                            >
+                            <div
+                                class="flex items-center gap-3 px-4 py-3 rounded-xl bg-midnight/60 border border-white/5"
+                            >
+                                <svg
+                                    class="w-4 h-4 text-muted flex-shrink-0"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.5"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
+                                    ></path>
+                                </svg>
+                                <span class="text-sm text-clean font-mono"
+                                    >{user.email}</span
+                                >
+                                <span
+                                    class="ml-auto text-xs px-2 py-0.5 rounded-full bg-cyan/10 border border-cyan/20 text-cyan"
+                                    >Verified</span
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Update password -->
+                    <div
+                        class="rounded-2xl bg-river border border-white/5 p-5 space-y-4"
+                    >
+                        <h3 class="text-sm font-semibold text-clean">
+                            Change Password
+                        </h3>
+
+                        {
+                            profileSuccess && (
+                                <div class="flex items-center gap-3 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-400">
+                                    <svg
+                                        class="w-4 h-4 flex-shrink-0"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                    >
+                                        <path
+                                            fill-rule="evenodd"
+                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                            clip-rule="evenodd"
+                                        />
+                                    </svg>
+                                    {profileSuccess}
+                                </div>
+                            )
+                        }
+                        {
+                            profileError && (
+                                <div class="flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                                    <svg
+                                        class="w-4 h-4 flex-shrink-0"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                    >
+                                        <path
+                                            fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                            clip-rule="evenodd"
+                                        />
+                                    </svg>
+                                    {profileError}
+                                </div>
+                            )
+                        }
+
+                        <form method="POST" class="space-y-3">
+                            <input
+                                type="hidden"
+                                name="action"
+                                value="update-profile"
+                            />
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div class="space-y-1.5">
+                                    <label
+                                        for="password"
+                                        class="block text-xs font-medium text-muted"
+                                        >New Password</label
+                                    >
+                                    <input
+                                        id="password"
+                                        name="password"
+                                        type="password"
+                                        placeholder="••••••••"
+                                        minlength="8"
+                                        class="w-full px-4 py-2.5 rounded-xl bg-midnight border border-white/10 text-clean placeholder:text-muted/40 text-sm outline-none focus:border-cyan/60 focus:ring-2 focus:ring-cyan/20 transition-all duration-200"
+                                    />
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label
+                                        for="confirm"
+                                        class="block text-xs font-medium text-muted"
+                                        >Confirm Password</label
+                                    >
+                                    <input
+                                        id="confirm"
+                                        name="confirm"
+                                        type="password"
+                                        placeholder="••••••••"
+                                        class="w-full px-4 py-2.5 rounded-xl bg-midnight border border-white/10 text-clean placeholder:text-muted/40 text-sm outline-none focus:border-cyan/60 focus:ring-2 focus:ring-cyan/20 transition-all duration-200"
+                                    />
+                                </div>
+                            </div>
+                            <button
+                                type="submit"
+                                class="px-5 py-2.5 bg-cyan hover:bg-cyan/90 text-midnight font-bold rounded-xl text-sm transition-all duration-150 active:scale-[0.98]"
+                            >
+                                Update Password
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Danger zone -->
+                    <div
+                        class="rounded-2xl border border-red-500/20 bg-red-500/5 p-5 space-y-3"
+                    >
+                        <div>
+                            <h3 class="text-sm font-bold text-red-400">
+                                Danger Zone
+                            </h3>
+                            <p class="text-xs text-muted mt-1">
+                                Permanently delete your account and all
+                                associated links. This cannot be undone.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onclick="confirm('Are you sure? All your links and data will be permanently deleted.') && alert('Account deletion coming soon.')"
+                            class="px-5 py-2.5 rounded-xl border border-pink/30 bg-pink/10 text-pink text-sm font-semibold hover:bg-pink/20 hover:border-pink/50 transition-all duration-150"
+                        >
+                            Delete Account
+                        </button>
+                    </div>
+                </section>
+
+                <!-- ──────────────────────────────────────────────────────── -->
+                <!-- SECTION 2: Custom Domains                                -->
+                <!-- ──────────────────────────────────────────────────────── -->
+                <section id="domains" class="scroll-mt-24 space-y-4">
+                    <div
+                        class="flex items-center gap-3 pb-2 border-b border-white/5"
+                    >
+                        <div
+                            class="w-8 h-8 rounded-lg bg-pink/10 border border-pink/20 flex items-center justify-center text-pink"
+                        >
+                            <svg
+                                class="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"
+                                ></path>
+                            </svg>
+                        </div>
+                        <h2 class="text-base font-bold text-clean">
+                            Custom Domains
+                        </h2>
+                    </div>
+
+                    <!-- Explainer -->
+                    <div
+                        class="rounded-2xl bg-river border border-white/5 p-5 space-y-4"
+                    >
+                        <p class="text-sm text-muted leading-relaxed">
+                            Use your own domain (e.g., <span
+                                class="text-cyan font-mono"
+                                >link.yourbrand.com</span
+                            >) instead of the default Zync domain. Your visitors
+                            see your brand, not ours.
+                        </p>
+
+                        <!-- Add domain form -->
+                        <form method="POST" class="flex gap-2">
+                            <input
+                                type="hidden"
+                                name="action"
+                                value="add-domain"
+                            />
+                            <input
+                                name="domain"
+                                type="text"
+                                placeholder="link.yourbrand.com"
+                                class="flex-1 px-4 py-2.5 rounded-xl bg-midnight border border-white/10 text-clean placeholder:text-muted/40 text-sm outline-none focus:border-cyan/60 focus:ring-2 focus:ring-cyan/20 transition-all duration-200 font-mono"
+                            />
+                            <button
+                                type="submit"
+                                class="px-5 py-2.5 bg-cyan hover:bg-cyan/90 text-midnight font-bold rounded-xl text-sm transition-all duration-150 whitespace-nowrap"
+                            >
+                                Verify Domain
+                            </button>
+                        </form>
+
+                        <!-- DNS instructions (pending state) -->
+                        {
+                            domainStatus === "pending" && (
+                                <div class="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-4 space-y-3">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+                                        <span class="text-xs font-semibold text-yellow-400 uppercase tracking-wider">
+                                            DNS Configuration Required
+                                        </span>
+                                    </div>
+                                    <p class="text-xs text-muted">
+                                        Add the following records to your DNS
+                                        provider to verify ownership:
+                                    </p>
+                                    <div class="space-y-2 text-xs font-mono">
+                                        <div class="flex items-start gap-3 p-3 rounded-lg bg-midnight/60 border border-white/5">
+                                            <span class="text-muted/60 flex-shrink-0 w-12">
+                                                TYPE
+                                            </span>
+                                            <span class="text-muted/60 flex-shrink-0 w-24">
+                                                NAME
+                                            </span>
+                                            <span class="text-muted/60">
+                                                VALUE
+                                            </span>
+                                        </div>
+                                        <div class="flex items-start gap-3 p-3 rounded-lg bg-midnight/60 border border-white/5">
+                                            <span class="text-pink flex-shrink-0 w-12">
+                                                CNAME
+                                            </span>
+                                            <span class="text-cyan flex-shrink-0 w-24">
+                                                link
+                                            </span>
+                                            <span class="text-clean break-all">
+                                                proxy.zync.app
+                                            </span>
+                                        </div>
+                                        <div class="flex items-start gap-3 p-3 rounded-lg bg-midnight/60 border border-white/5">
+                                            <span class="text-pink flex-shrink-0 w-12">
+                                                TXT
+                                            </span>
+                                            <span class="text-cyan flex-shrink-0 w-24">
+                                                _zync
+                                            </span>
+                                            <span class="text-clean break-all">
+                                                verify=zync-
+                                                {user.id.slice(0, 12)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-muted/60">
+                                        DNS propagation can take up to 48 hours.
+                                        Click "Verify Domain" after adding the
+                                        records.
+                                    </p>
+                                </div>
+                            )
+                        }
+                    </div>
+                </section>
+
+                <!-- ──────────────────────────────────────────────────────── -->
+                <!-- SECTION 3: Developer API                                 -->
+                <!-- ──────────────────────────────────────────────────────── -->
+                <section id="api" class="scroll-mt-24 space-y-4">
+                    <div
+                        class="flex items-center gap-3 pb-2 border-b border-white/5"
+                    >
+                        <div
+                            class="w-8 h-8 rounded-lg bg-cyan/10 border border-cyan/20 flex items-center justify-center text-cyan"
+                        >
+                            <svg
+                                class="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"
+                                ></path>
+                            </svg>
+                        </div>
+                        <h2 class="text-base font-bold text-clean">
+                            Developer API
+                        </h2>
+                    </div>
+
+                    <!-- Intro + generate -->
+                    <div
+                        class="rounded-2xl bg-river border border-white/5 p-5 space-y-4"
+                    >
+                        <p class="text-sm text-muted leading-relaxed">
+                            Use personal access tokens to create and manage
+                            links programmatically — perfect for <span
+                                class="text-clean font-medium">n8n</span
+                            >, <span class="text-clean font-medium">Python</span
+                            >, or any HTTP client.
+                        </p>
+
+                        <!-- Newly generated key — shown once -->
+                        {
+                            newApiKey && (
+                                <div class="rounded-xl border border-cyan/30 bg-cyan/5 p-4 space-y-2">
+                                    <div class="flex items-center gap-2">
+                                        <svg
+                                            class="w-4 h-4 text-cyan"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"
+                                            />
+                                        </svg>
+                                        <span class="text-xs font-semibold text-cyan uppercase tracking-wider">
+                                            New API Key — Copy Now
+                                        </span>
+                                    </div>
+                                    <p class="text-xs text-muted">
+                                        This key will only be shown once. Store
+                                        it somewhere safe.
+                                    </p>
+                                    <div class="flex items-center gap-2">
+                                        <code
+                                            id="api-key-val"
+                                            class="flex-1 px-3 py-2 rounded-lg bg-midnight text-cyan font-mono text-xs break-all border border-cyan/20"
+                                        >
+                                            {newApiKey}
+                                        </code>
+                                        <button
+                                            id="copy-api-key"
+                                            type="button"
+                                            class="flex-shrink-0 p-2 rounded-lg bg-cyan/10 border border-cyan/20 text-cyan hover:bg-cyan/20 transition-all"
+                                        >
+                                            <svg
+                                                class="w-4 h-4"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                                />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        <form method="POST">
+                            <input
+                                type="hidden"
+                                name="action"
+                                value="generate-api-key"
+                            />
+                            <button
+                                type="submit"
+                                class="flex items-center gap-2 px-5 py-2.5 bg-river border border-white/10 hover:border-cyan/30 hover:text-cyan text-muted rounded-xl text-sm font-semibold transition-all duration-150"
+                            >
+                                <svg
+                                    class="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        d="M12 4.5v15m7.5-7.5h-15"></path>
+                                </svg>
+                                Generate New API Key
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- API Keys table -->
+                    <div
+                        class="rounded-2xl border border-white/5 overflow-hidden"
+                    >
+                        <div class="bg-river px-5 py-3 border-b border-white/5">
+                            <h3
+                                class="text-xs font-semibold text-muted uppercase tracking-wider"
+                            >
+                                Active Keys
+                            </h3>
+                        </div>
+                        {
+                            mockApiKeys.length === 0 ? (
+                                <div class="px-5 py-8 text-center text-sm text-muted/60">
+                                    No API keys yet.
+                                </div>
+                            ) : (
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr class="border-b border-white/5 bg-midnight/30">
+                                            <th class="text-left px-5 py-3 text-xs font-semibold text-muted">
+                                                Name
+                                            </th>
+                                            <th class="text-left px-5 py-3 text-xs font-semibold text-muted">
+                                                Key
+                                            </th>
+                                            <th class="text-left px-5 py-3 text-xs font-semibold text-muted">
+                                                Created
+                                            </th>
+                                            <th class="text-left px-5 py-3 text-xs font-semibold text-muted">
+                                                Last Used
+                                            </th>
+                                            <th class="text-center px-5 py-3 text-xs font-semibold text-muted">
+                                                Action
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-white/5">
+                                        {mockApiKeys.map((k) => (
+                                            <tr class="hover:bg-white/[0.02] transition-colors">
+                                                <td class="px-5 py-3.5 text-clean font-medium">
+                                                    {k.name}
+                                                </td>
+                                                <td class="px-5 py-3.5">
+                                                    <code class="text-cyan font-mono text-xs bg-cyan/10 px-2 py-0.5 rounded-md">
+                                                        {k.prefix}••••••••
+                                                    </code>
+                                                </td>
+                                                <td class="px-5 py-3.5 text-muted text-xs">
+                                                    {k.created_at}
+                                                </td>
+                                                <td class="px-5 py-3.5 text-muted text-xs">
+                                                    {k.last_used}
+                                                </td>
+                                                <td class="px-5 py-3.5 text-center">
+                                                    <form
+                                                        method="POST"
+                                                        class="inline"
+                                                    >
+                                                        <input
+                                                            type="hidden"
+                                                            name="action"
+                                                            value="revoke-key"
+                                                        />
+                                                        <input
+                                                            type="hidden"
+                                                            name="key_id"
+                                                            value={k.id}
+                                                        />
+                                                        <button
+                                                            type="submit"
+                                                            class="px-3 py-1 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-xs hover:bg-red-500/20 transition-all"
+                                                            onclick="return confirm('Revoke this API key?')"
+                                                        >
+                                                            Revoke
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )
+                        }
+                    </div>
+
+                    <!-- Code example -->
+                    <div
+                        class="rounded-2xl bg-river border border-white/5 p-5 space-y-3"
+                    >
+                        <h3 class="text-sm font-semibold text-clean">
+                            Quick Example
+                        </h3>
+                        <pre
+                            class="text-xs font-mono bg-midnight rounded-xl border border-white/5 p-4 overflow-x-auto text-muted leading-relaxed"><span class="text-muted/50"># Create a short link via cURL</span>
+<span class="text-cyan">curl</span> -X POST https://zync.app/api/v1/links \
+  -H <span class="text-green-400">"Authorization: Bearer YOUR_API_KEY"</span> \
+  -H <span class="text-green-400">"Content-Type: application/json"</span> \
+  -d <span class="text-green-400">'&#123;"url":"https://example.com","alias":"my-link"&#125;'</span></pre>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+</Layout>
+
+<script>
+    // Copy new API key button
+    const copyBtn = document.getElementById("copy-api-key");
+    const keyVal = document.getElementById("api-key-val");
+    copyBtn?.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(keyVal?.textContent?.trim() ?? "");
+        copyBtn.innerHTML = `<svg class="w-4 h-4 text-cyan" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`;
+        setTimeout(() => {
+            copyBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`;
+        }, 2000);
+    });
+</script>

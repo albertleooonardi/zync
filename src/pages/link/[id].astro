@@ -7,36 +7,40 @@ import ClicksChart from "../../components/analytics/ClicksChart.astro";
 import ReferrerBreakdown from "../../components/analytics/ReferrerBreakdown.astro";
 import DeviceBreakdown from "../../components/analytics/DeviceBreakdown.astro";
 import GeoBreakdown from "../../components/analytics/GeoBreakdown.astro";
+import BackButton from "../../components/ui/BackButton.astro";
 
-// ── Auth guard ────────────────────────────────────────────────────────────────
+// ── Auth ──────────────────────────────────────────────────────────────────────
 const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
-const {
-    data: { session },
-} = await supabase.auth.getSession();
+const { data: { session } } = await supabase.auth.getSession();
 if (!session) return Astro.redirect("/login");
 const user = session.user;
 
-// ── Fetch link (ownership check) ──────────────────────────────────────────────
+// ── Fetch link ────────────────────────────────────────────────────────────────
 const { id } = Astro.params;
 const { data: link, error: linkError } = await supabase
     .from("links")
-    .select("*")
-    .eq("id", id)
-    .eq("user_id", user.id) // security: only owner can view analytics
-    .maybeSingle();
+    .select("id, alias, original_url, created_at, user_id")
+    .eq("id", id!)
+    .eq("user_id", user.id)
+    .single();
 
-if (linkError || !link) {
-    return new Response(null, { status: 404 });
-}
+if (linkError || !link) return Astro.redirect("/dashboard");
 
-// ── Fetch all clicks for this link ────────────────────────────────────────────
-const { data: clicks = [] } = await supabase
+// ── Fetch clicks ──────────────────────────────────────────────────────────────
+const { data: clickRows } = await supabase
     .from("clicks")
-    .select("clicked_at, country, referrer, user_agent, device")
-    .eq("link_id", id)
+    .select("clicked_at, referrer, country, user_agent, device")
+    .eq("link_id", link.id)
     .order("clicked_at", { ascending: true });
 
-const safeClicks = clicks ?? [];
+const safeClicks = (clickRows ?? []) as Array<{
+    clicked_at: string;
+    referrer: string | null;
+    country: string | null;
+    user_agent: string | null;
+    device: string | null;
+}>;
+
 
 // ── Helper: detect device from user_agent ─────────────────────────────────────
 function detectDevice(ua: string | null): string {
@@ -48,29 +52,6 @@ function detectDevice(ua: string | null): string {
     return "desktop";
 }
 
-// ── Aggregate: clicks per day (last 30 days) ──────────────────────────────────
-function buildChartData() {
-    const days: Record<string, number> = {};
-    const today = new Date();
-    for (let i = 29; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        const key = d.toISOString().slice(0, 10);
-        days[key] = 0;
-    }
-    for (const c of safeClicks) {
-        const key = c.clicked_at.slice(0, 10);
-        if (key in days) days[key]++;
-    }
-    const labels = Object.keys(days).map((d) => {
-        const dt = new Date(d + "T00:00:00");
-        return dt.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-        });
-    });
-    return { labels, values: Object.values(days) };
-}
 
 // ── Aggregate: referrers ──────────────────────────────────────────────────────
 function buildReferrers() {
@@ -136,7 +117,6 @@ function buildGeo() {
         }));
 }
 
-const chartData = buildChartData();
 const referrers = buildReferrers();
 const devices = buildDevices();
 const geoData = buildGeo();
@@ -151,6 +131,7 @@ const shortUrl = `${Astro.url.host}/${link.alias}`;
     <DashboardNav userEmail={user.email} />
 
     <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+
         <!-- Header -->
         <AnalyticsHeader
             alias={link.alias}
@@ -161,13 +142,19 @@ const shortUrl = `${Astro.url.host}/${link.alias}`;
 
         <!-- Quick stat pills -->
         <div class="flex flex-wrap gap-3">
+            <!-- Total Clicks — has id for Realtime live update -->
+            <div class="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-river border border-white/5">
+                <span class="text-xs text-muted">Total Clicks</span>
+                <span
+                    id="analytics-total-clicks"
+                    class="text-sm font-bold text-cyan transition-colors duration-300"
+                >
+                    {totalClicks.toLocaleString()}
+                </span>
+            </div>
+            <!-- Other pills -->
             {
                 [
-                    {
-                        label: "Total Clicks",
-                        value: totalClicks.toLocaleString(),
-                        color: "text-cyan",
-                    },
                     {
                         label: "Created",
                         value: new Date(link.created_at).toLocaleDateString(
@@ -197,8 +184,12 @@ const shortUrl = `${Astro.url.host}/${link.alias}`;
             }
         </div>
 
-        <!-- Clicks chart -->
-        <ClicksChart data={chartData} totalClicks={totalClicks} />
+        <!-- Clicks chart (with range filter) -->
+        <ClicksChart
+            clicks={safeClicks}
+            linkCreatedAt={link.created_at}
+            totalClicks={totalClicks}
+        />
 
         <!-- Breakdown grid -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -208,3 +199,53 @@ const shortUrl = `${Astro.url.host}/${link.alias}`;
         </div>
     </main>
 </Layout>
+
+<!-- Hidden element to pass SSR values to the client-side Realtime script -->
+<div
+    id="rt-config"
+    data-url={import.meta.env.PUBLIC_SUPABASE_URL}
+    data-key={import.meta.env.PUBLIC_SUPABASE_ANON_KEY}
+    data-link-id={link.id}
+    data-total={totalClicks}
+    hidden
+></div>
+
+<script>
+    import { createClient } from "@supabase/supabase-js";
+
+    const cfg = document.getElementById("rt-config")!;
+    const sb = createClient(cfg.dataset.url!, cfg.dataset.key!);
+    const linkId = cfg.dataset.linkId!;
+    let liveTotal = parseInt(cfg.dataset.total ?? "0", 10);
+
+    const totalEl = document.getElementById("analytics-total-clicks");
+
+    // Small "live" pulse dot appended next to the counter
+    if (totalEl) {
+        const pulse = document.createElement("span");
+        pulse.className =
+            "inline-block w-2 h-2 rounded-full bg-cyan animate-pulse ml-1.5 align-middle opacity-70";
+        pulse.title = "Live";
+        totalEl.parentElement?.appendChild(pulse);
+    }
+
+    sb.channel(`analytics-${linkId}`)
+        .on(
+            "postgres_changes",
+            {
+                event: "INSERT",
+                schema: "public",
+                table: "clicks",
+                filter: `link_id=eq.${linkId}`,
+            },
+            () => {
+                liveTotal++;
+                if (totalEl) {
+                    totalEl.textContent = liveTotal.toLocaleString();
+                    totalEl.style.color = "#22d3ee";
+                    setTimeout(() => (totalEl.style.color = ""), 800);
+                }
+            }
+        )
+        .subscribe();
+</script>

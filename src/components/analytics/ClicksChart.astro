@@ -1,60 +1,209 @@
 ---
-interface ChartData {
-    labels: string[];
-    values: number[];
+interface ClickRow {
+    clicked_at: string;
 }
 
 interface Props {
-    data: ChartData;
+    /** All raw click rows — filtering happens client-side */
+    clicks: ClickRow[];
+    /** ISO string of when the link was created — used for "All time" range */
+    linkCreatedAt: string;
     totalClicks: number;
 }
 
-const { data, totalClicks } = Astro.props;
+const { clicks, linkCreatedAt, totalClicks } = Astro.props;
 ---
 
 <div class="rounded-2xl bg-river border border-white/5 p-6 space-y-4">
+    <!-- Header row: title left, click count + filter buttons right -->
     <div class="flex items-start justify-between flex-wrap gap-3">
         <div>
             <h2 class="text-base font-bold text-clean">Click Activity</h2>
-            <p class="text-xs text-muted mt-0.5">Last 30 days</p>
+            <p id="chart-range-label" class="text-xs text-muted mt-0.5">
+                Last 30 days
+            </p>
         </div>
-        <div class="text-right">
-            <p class="text-2xl font-black text-cyan tabular-nums">
+        <div class="flex flex-col items-end gap-2">
+            <p
+                id="chart-total"
+                class="text-2xl font-black text-cyan tabular-nums transition-all duration-300"
+            >
                 {totalClicks.toLocaleString()}
             </p>
-            <p class="text-xs text-muted">total clicks</p>
+            <p class="text-xs text-muted -mt-1">clicks in range</p>
         </div>
     </div>
+
+    <!-- Filter pill buttons -->
+    <div class="flex gap-1.5 flex-wrap">
+        {
+            [
+                { key: "today", label: "Today" },
+                { key: "7d", label: "7 Days" },
+                { key: "30d", label: "30 Days" },
+                { key: "all", label: "All Time" },
+            ].map(({ key, label }) => (
+                <button
+                    type="button"
+                    data-range={key}
+                    class={`range-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 border ${
+                        key === "30d"
+                            ? "bg-cyan/15 border-cyan/40 text-cyan"
+                            : "bg-white/5 border-white/10 text-muted hover:text-clean hover:border-white/20"
+                    }`}
+                >
+                    {label}
+                </button>
+            ))
+        }
+    </div>
+
+    <!-- Canvas -->
     <div class="relative h-56">
         <canvas id="clicksChart"></canvas>
     </div>
 </div>
 
-<script define:vars={{ chartLabels: data.labels, chartValues: data.values }}>
-    // Load Chart.js from CDN then render
+<!-- Pass click data + link creation date to client script via data element -->
+<div
+    id="chart-data"
+    data-clicks={JSON.stringify(clicks.map((c) => c.clicked_at))}
+    data-created={linkCreatedAt}
+    hidden
+></div>
+
+<script>
+    // ── Load Chart.js from CDN then initialise ────────────────────────────────
     const script = document.createElement("script");
     script.src =
         "https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js";
-    script.onload = () => {
-        const ctx = document.getElementById("clicksChart").getContext("2d");
+    document.head.appendChild(script);
 
-        const gradient = ctx.createLinearGradient(
-            0,
-            0,
-            0,
-            ctx.canvas.clientHeight
-        );
+    script.onload = () => {
+        const el = document.getElementById("chart-data")!;
+        const allTimestamps: string[] = JSON.parse(el.dataset.clicks ?? "[]");
+        // linkCreated expressed as UTC midnight so comparisons are consistent
+        const linkCreatedStr = el.dataset.created!.slice(0, 10); // "YYYY-MM-DD"
+
+        // ── UTC helpers ────────────────────────────────────────────────────────
+        /** Returns "YYYY-MM-DD" for a UTC date object */
+        function utcKey(d: Date): string {
+            return d.toISOString().slice(0, 10);
+        }
+
+        /** UTC midnight for a given UTC date string "YYYY-MM-DD" */
+        function utcMidnight(iso: string): Date {
+            const [y, m, day] = iso.split("-").map(Number);
+            return new Date(Date.UTC(y, m - 1, day));
+        }
+
+        /** "Mar 1" style label from "YYYY-MM-DD" */
+        function formatLabel(isoDate: string): string {
+            return utcMidnight(isoDate).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                timeZone: "UTC",
+            });
+        }
+
+        /** Today's UTC date key */
+        function todayKey(): string {
+            return utcKey(new Date());
+        }
+
+        /** N days ago UTC date key */
+        function daysAgoKey(n: number): string {
+            const d = new Date();
+            d.setUTCDate(d.getUTCDate() - n);
+            return utcKey(d);
+        }
+
+        /** Build a zero-filled map from `fromKey` to `toKey` (inclusive, UTC) */
+        function buildDays(fromKey: string, toKey: string): Record<string, number> {
+            const days: Record<string, number> = {};
+            const cur = utcMidnight(fromKey);
+            const end = utcMidnight(toKey);
+            while (cur <= end) {
+                days[utcKey(cur)] = 0;
+                cur.setUTCDate(cur.getUTCDate() + 1);
+            }
+            return days;
+        }
+
+        /** Cap fromKey so it's never before the link was created */
+        function capToCreation(fromKey: string): string {
+            return fromKey < linkCreatedStr ? linkCreatedStr : fromKey;
+        }
+
+        function aggregateForRange(range: string): {
+            labels: string[];
+            values: number[];
+            total: number;
+            description: string;
+        } {
+            const today = todayKey();
+            let fromKey: string;
+            let description: string;
+
+            if (range === "today") {
+                fromKey = today;
+                description = "Today";
+            } else if (range === "7d") {
+                fromKey = capToCreation(daysAgoKey(6));
+                description =
+                    fromKey === linkCreatedStr
+                        ? `Since ${formatLabel(linkCreatedStr)}`
+                        : "Last 7 days";
+            } else if (range === "30d") {
+                fromKey = capToCreation(daysAgoKey(29));
+                description =
+                    fromKey === linkCreatedStr
+                        ? `Since ${formatLabel(linkCreatedStr)}`
+                        : "Last 30 days";
+            } else {
+                // All time — always starts from link creation
+                fromKey = linkCreatedStr;
+                description = `Since ${formatLabel(linkCreatedStr)}`;
+            }
+
+            const days = buildDays(fromKey, today);
+            let total = 0;
+
+            for (const ts of allTimestamps) {
+                const key = ts.slice(0, 10); // UTC date from ISO timestamp
+                if (key in days) {
+                    days[key]++;
+                    total++;
+                }
+            }
+
+            return {
+                labels: Object.keys(days).map(formatLabel),
+                values: Object.values(days),
+                total,
+                description,
+            };
+        }
+
+        // ── Chart init ────────────────────────────────────────────────────────
+        const ctx = (
+            document.getElementById("clicksChart") as HTMLCanvasElement
+        ).getContext("2d")!;
+
+        const gradient = ctx.createLinearGradient(0, 0, 0, ctx.canvas.clientHeight || 224);
         gradient.addColorStop(0, "rgba(6, 182, 212, 0.25)");
         gradient.addColorStop(1, "rgba(6, 182, 212, 0)");
 
-        new Chart(ctx, {
+        const initial = aggregateForRange("30d");
+
+        const chart = new (window as any).Chart(ctx, {
             type: "line",
             data: {
-                labels: chartLabels,
+                labels: initial.labels,
                 datasets: [
                     {
                         label: "Clicks",
-                        data: chartValues,
+                        data: initial.values,
                         borderColor: "#06B6D4",
                         borderWidth: 2,
                         backgroundColor: gradient,
@@ -72,6 +221,7 @@ const { data, totalClicks } = Astro.props;
                 responsive: true,
                 maintainAspectRatio: false,
                 interaction: { mode: "index", intersect: false },
+                animation: { duration: 300 },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -92,6 +242,7 @@ const { data, totalClicks } = Astro.props;
                             color: "#64748B",
                             font: { size: 11 },
                             maxRotation: 0,
+                            maxTicksLimit: 10,
                         },
                         border: { color: "transparent" },
                     },
@@ -102,7 +253,7 @@ const { data, totalClicks } = Astro.props;
                             color: "#64748B",
                             font: { size: 11 },
                             stepSize: 1,
-                            callback: (val) =>
+                            callback: (val: number) =>
                                 Number.isInteger(val) ? val : null,
                         },
                         border: { color: "transparent" },
@@ -110,6 +261,52 @@ const { data, totalClicks } = Astro.props;
                 },
             },
         });
+
+        // ── Filter buttons ────────────────────────────────────────────────────
+        const totalEl = document.getElementById("chart-total");
+        const labelEl = document.getElementById("chart-range-label");
+
+        document
+            .querySelectorAll<HTMLButtonElement>(".range-btn")
+            .forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const range = btn.dataset.range!;
+
+                    // Active styling
+                    document
+                        .querySelectorAll<HTMLButtonElement>(".range-btn")
+                        .forEach((b) => {
+                            b.classList.remove(
+                                "bg-cyan/15",
+                                "border-cyan/40",
+                                "text-cyan"
+                            );
+                            b.classList.add(
+                                "bg-white/5",
+                                "border-white/10",
+                                "text-muted"
+                            );
+                        });
+                    btn.classList.remove(
+                        "bg-white/5",
+                        "border-white/10",
+                        "text-muted"
+                    );
+                    btn.classList.add("bg-cyan/15", "border-cyan/40", "text-cyan");
+
+                    const result = aggregateForRange(range);
+                    chart.data.labels = result.labels;
+                    chart.data.datasets[0].data = result.values;
+                    chart.update();
+
+                    if (totalEl)
+                        totalEl.textContent = result.total.toLocaleString();
+                    if (labelEl) labelEl.textContent = result.description;
+                });
+            });
+
+        // Update sub-label for initial 30d view
+        const initialResult = aggregateForRange("30d");
+        if (labelEl) labelEl.textContent = initialResult.description;
     };
-    document.head.appendChild(script);
 </script>

@@ -5,9 +5,11 @@ interface Props {
     /** Optional sub-label shown under the value */
     sub?: string;
     accent?: "cyan" | "pink" | "default";
+    /** Optional id applied to the value element for Realtime DOM updates */
+    valueId?: string;
 }
 
-const { label, value, sub, accent = "default" } = Astro.props;
+const { label, value, sub, accent = "default", valueId } = Astro.props;
 
 const accentColor = {
     cyan: "text-cyan",
@@ -34,7 +36,7 @@ const iconBg = {
         <p class="text-xs text-muted font-medium uppercase tracking-wider">
             {label}
         </p>
-        <p class={`text-2xl font-black mt-0.5 ${accentColor} truncate`}>
+        <p id={valueId} class={`text-2xl font-black mt-0.5 ${accentColor} truncate transition-colors duration-300`}>
             {value}
         </p>
         {sub && <p class="text-xs text-muted/60 mt-0.5 truncate">{sub}</p>}

@@ -1,67 +1,31 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-// import { createSupabaseServerClient } from "../../lib/supabase";
+import { createSupabaseServerClient } from "../../lib/supabase";
 import DashboardNav from "../../components/dashboard/DashboardNav.astro";
 import StatCard from "../../components/dashboard/StatCard.astro";
 import LinksTable from "../../components/dashboard/LinksTable.astro";
 import type { Link } from "../../types/dashboard";
 
-// ── AUTH BYPASSED FOR PREVIEW — restore the block below when done ─────────────
-// const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
-// const { data: { session } } = await supabase.auth.getSession();
-// if (!session) return Astro.redirect("/login");
-// const user = session.user;
+// ── Auth ──────────────────────────────────────────────────────────────────────
+const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
+const { data: { session } } = await supabase.auth.getSession();
+if (!session) return Astro.redirect("/login");
+const user = session.user;
 
-const user = { email: "demo@zync.app" };
+// ── Fetch links ───────────────────────────────────────────────────────────────
+const { data: links, error } = await supabase
+    .from("links")
+    .select("id, user_id, alias, original_url, created_at, click_count")
+    .order("created_at", { ascending: false });
 
-// ── MOCK DATA (remove when restoring auth) ────────────────────────────────────
-const links: Link[] = [
-    {
-        id: "1",
-        user_id: "u1",
-        alias: "my-portfolio",
-        original_url: "https://myportfolio.example.com/about",
-        created_at: "2026-02-10T08:00:00Z",
-        click_count: 342,
-    },
-    {
-        id: "2",
-        user_id: "u1",
-        alias: "zync-docs",
-        original_url: "https://docs.zync.app/getting-started",
-        created_at: "2026-02-15T12:30:00Z",
-        click_count: 187,
-    },
-    {
-        id: "3",
-        user_id: "u1",
-        alias: "launch-tweet",
-        original_url: "https://twitter.com/zync/status/1234567890",
-        created_at: "2026-02-20T09:15:00Z",
-        click_count: 94,
-    },
-    {
-        id: "4",
-        user_id: "u1",
-        alias: "product-hunt",
-        original_url: "https://www.producthunt.com/posts/zync",
-        created_at: "2026-02-25T16:00:00Z",
-        click_count: 511,
-    },
-    {
-        id: "5",
-        user_id: "u1",
-        alias: "newsletter",
-        original_url: "https://newsletter.example.com/issue-12",
-        created_at: "2026-02-28T07:00:00Z",
-        click_count: 63,
-    },
-];
+const safeLinks: Link[] = (links ?? []) as Link[];
+
+if (error) console.error("Dashboard fetch error:", error.message);
 
 // ── Compute stats ─────────────────────────────────────────────────────────────
-const totalLinks = links.length;
-const totalClicks = links.reduce((sum, l) => sum + (l.click_count ?? 0), 0);
-const topLink = links.reduce<Link | null>(
+const totalLinks = safeLinks.length;
+const totalClicks = safeLinks.reduce((sum, l) => sum + (l.click_count ?? 0), 0);
+const topLink = safeLinks.reduce<Link | null>(
     (best, l) =>
         !best || (l.click_count ?? 0) > (best.click_count ?? 0) ? l : best,
     null
@@ -148,6 +112,7 @@ const greeting =
                 label="Total Clicks (All Time)"
                 value={totalClicks.toLocaleString()}
                 accent="pink"
+                valueId="stat-total-clicks-value"
             >
                 <svg
                     fill="none"
@@ -191,14 +156,68 @@ const greeting =
             <div class="flex items-center justify-between">
                 <h2 class="text-lg font-bold text-clean">Recent Links</h2>
                 {
-                    links.length > 0 && (
+                    safeLinks.length > 0 && (
                         <span class="text-xs text-muted">
                             {totalLinks} link{totalLinks !== 1 ? "s" : ""} total
                         </span>
                     )
                 }
             </div>
-            <LinksTable links={links} baseUrl={baseUrl} />
+            <LinksTable links={safeLinks} baseUrl={baseUrl} />
         </section>
     </main>
 </Layout>
+
+<!-- Hidden element to pass SSR values to the client-side module script -->
+<div
+    id="rt-config"
+    data-url={import.meta.env.PUBLIC_SUPABASE_URL}
+    data-key={import.meta.env.PUBLIC_SUPABASE_ANON_KEY}
+    data-links={JSON.stringify(safeLinks.map((l) => ({ id: l.id, click_count: l.click_count ?? 0 })))}
+    hidden
+></div>
+
+<script>
+    import { createClient } from "@supabase/supabase-js";
+
+    const cfg = document.getElementById("rt-config")!;
+    const sb = createClient(cfg.dataset.url!, cfg.dataset.key!);
+
+    // Track click counts in memory so we can recompute the total card
+    const links: { id: string; click_count: number }[] = JSON.parse(cfg.dataset.links ?? "[]");
+    const counts: Record<string, number> = {};
+    for (const l of links) counts[l.id] = l.click_count;
+
+    function recomputeTotalCard() {
+        const total = Object.values(counts).reduce((s, v) => s + v, 0);
+        const el = document.getElementById("stat-total-clicks-value");
+        if (el) {
+            el.textContent = total.toLocaleString();
+            el.classList.add("!text-cyan");
+            setTimeout(() => el.classList.remove("!text-cyan"), 700);
+        }
+    }
+
+    sb.channel("dashboard-links")
+        .on(
+            "postgres_changes",
+            { event: "UPDATE", schema: "public", table: "links" },
+            (payload: { new: { id: string; click_count: number } }) => {
+                const { id, click_count } = payload.new;
+                if (!(id in counts)) return; // not this user's link
+
+                counts[id] = click_count;
+
+                // Patch the row cell
+                const cell = document.getElementById(`clicks-${id}`);
+                if (cell) {
+                    cell.textContent = click_count.toLocaleString();
+                    cell.classList.add("!text-cyan");
+                    setTimeout(() => cell.classList.remove("!text-cyan"), 900);
+                }
+
+                recomputeTotalCard();
+            }
+        )
+        .subscribe();
+</script>
