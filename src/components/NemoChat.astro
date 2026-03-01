@@ -1,6 +1,7 @@
 ---
 // Nemo — floating AI chat assistant
 // Injected in Layout.astro, visible on every page
+import { marked } from "marked";
 ---
 
 <!-- Floating button -->
@@ -129,8 +130,14 @@
         const bubble = document.createElement("div");
         bubble.className = isUser
             ? "bg-cyan/20 border border-cyan/25 rounded-2xl rounded-tr-sm px-3.5 py-2.5 text-sm text-clean/90 leading-relaxed max-w-[85%]"
-            : "bg-white/6 rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm text-clean/90 leading-relaxed max-w-[85%]";
-        bubble.textContent = text;
+            : "prose prose-sm prose-invert prose-p:my-1 prose-ul:my-1 prose-a:text-cyan hover:prose-a:underline prose-strong:text-cyan bg-white/6 rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm text-clean/90 leading-relaxed max-w-[85%]";
+            
+        if (isUser) {
+            bubble.textContent = text;
+        } else {
+            // Render markdown for bot responses. We use a global function attached below.
+            bubble.innerHTML = window.parseMarkdown ? window.parseMarkdown(text) : text;
+        }
 
         if (!isUser) {
             const icon = document.createElement("span");
@@ -214,7 +221,13 @@
 })();
 </script>
 
-<style>
+<script>
+    import { marked } from "marked";
+    // Expose marked for the inline script to use
+    window.parseMarkdown = (text) => marked.parse(text, { async: false });
+</script>
+
+<style is:global>
     #nemo-messages::-webkit-scrollbar { width: 4px; }
     #nemo-messages::-webkit-scrollbar-track { background: transparent; }
     #nemo-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }

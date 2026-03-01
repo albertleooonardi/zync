@@ -11,9 +11,8 @@ import BackButton from "../../components/ui/BackButton.astro";
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
-const { data: { session } } = await supabase.auth.getSession();
-if (!session) return Astro.redirect("/login");
-const user = session.user;
+const { data: { user }, error: authError } = await supabase.auth.getUser();
+if (authError || !user) return Astro.redirect("/login");
 
 // ── Fetch link ────────────────────────────────────────────────────────────────
 const { id } = Astro.params;
@@ -205,6 +204,7 @@ const shortUrl = `${Astro.url.host}/${link.alias}`;
     id="rt-config"
     data-url={import.meta.env.PUBLIC_SUPABASE_URL}
     data-key={import.meta.env.PUBLIC_SUPABASE_ANON_KEY}
+    data-token={Astro.cookies.get("sb-access-token")?.value}
     data-link-id={link.id}
     data-total={totalClicks}
     hidden
@@ -214,7 +214,15 @@ const shortUrl = `${Astro.url.host}/${link.alias}`;
     import { createClient } from "@supabase/supabase-js";
 
     const cfg = document.getElementById("rt-config")!;
-    const sb = createClient(cfg.dataset.url!, cfg.dataset.key!);
+    const token = cfg.dataset.token;
+    
+    // We MUST pass the Auth token here, otherwise Realtime connects anonymously 
+    // and Postgres Row Level Security (RLS) silently blocks all INSERT events.
+    const sb = createClient(cfg.dataset.url!, cfg.dataset.key!, {
+        global: {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+        }
+    });
     const linkId = cfg.dataset.linkId!;
     let liveTotal = parseInt(cfg.dataset.total ?? "0", 10);
 
@@ -238,13 +246,19 @@ const shortUrl = `${Astro.url.host}/${link.alias}`;
                 table: "clicks",
                 filter: `link_id=eq.${linkId}`,
             },
-            () => {
+            (payload) => {
                 liveTotal++;
                 if (totalEl) {
                     totalEl.textContent = liveTotal.toLocaleString();
                     totalEl.style.color = "#22d3ee";
                     setTimeout(() => (totalEl.style.color = ""), 800);
                 }
+                
+                // Dispatch a custom event with the new click data
+                // Child components (like ClicksChart) listen to this to update their UI
+                window.dispatchEvent(
+                    new CustomEvent("new-click", { detail: payload.new })
+                );
             }
         )
         .subscribe();

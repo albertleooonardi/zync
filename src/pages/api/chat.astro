@@ -2,8 +2,10 @@
 // POST /api/chat
 // Body: { messages: [{ role: "user"|"model", text: string }] }
 // Returns: { reply: string }
+export const prerender = false;
 
-import { generate } from "../../lib/gemini";
+import { generateWithTools, type GeminiFunctionDeclaration, type GeminiMessage } from "../../lib/gemini";
+import { createSupabaseAdminClient } from "../../lib/supabase";
 
 if (Astro.request.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
@@ -16,108 +18,209 @@ let body: { messages?: Array<{ role: string; text: string }> };
 try {
     body = await Astro.request.json();
 } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
 }
 
-const messages = body.messages ?? [];
-const userMessage = messages[messages.length - 1]?.text ?? "";
+const reqMessages = body.messages ?? [];
+const userMessage = reqMessages[reqMessages.length - 1]?.text ?? "";
 
 if (!userMessage.trim()) {
-    return new Response(JSON.stringify({ error: "Empty message" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ error: "Empty message" }), { status: 400 });
 }
 
-// Build conversation context (last 6 turns to stay within token limits)
-const history = messages
+// Ensure user is authenticated to perform agentic actions on their behalf
+const supabase = createSupabaseAdminClient();
+// We need the user's cookie to get their session
+const authFallback = Astro.cookies.get("sb-access-token")?.value;
+const authCookie = Astro.request.headers.get("cookie") || "";
+let userId: string | null = null;
+
+// Try to get user from token in cookies directly using Supabase anon client flow
+import { createClient } from "@supabase/supabase-js";
+const supaAnon = createClient(
+    import.meta.env.PUBLIC_SUPABASE_URL,
+    import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
+    { auth: { persistSession: false } }
+);
+
+if (authFallback) {
+    const { data } = await supaAnon.auth.getUser(authFallback);
+    userId = data.user?.id || null;
+}
+
+// Define the tools Gemini can use
+const tools: GeminiFunctionDeclaration[] = [
+    {
+        name: "create_link",
+        description: "Create a new shortened Zync link for the user. Call this when the user asks you to shorten a URL.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                original_url: { type: "STRING", description: "The full destination URL (must start with http:// or https://)" },
+                alias: { type: "STRING", description: "Optional custom short alias (e.g. 'my-promo'). Leave empty for auto-generated." }
+            },
+            required: ["original_url"]
+        }
+    },
+    {
+        name: "get_link_stats",
+        description: "Get the current analytics summary (clicks, creation date, top devices) for a specific shortened link.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                alias: { type: "STRING", description: "The short alias of the link to fetch stats for (e.g. 'my-promo')" }
+            },
+            required: ["alias"]
+        }
+    }
+];
+
+// Build history context (last 6 turns limit)
+const history = reqMessages
     .slice(-7, -1)
     .map((m) => `${m.role === "user" ? "User" : "Nemo"}: ${m.text}`)
     .join("\n");
 
-const systemPrompt = `You are Nemo, a friendly and helpful AI assistant built into Zync — a modern URL shortener and link analytics platform.
+const systemPrompt = `You are Nemo, a helpful AI assistant built into Zync (a modern URL shortener).
+You can now ACT on behalf of the user using tools:
+1. create_link: Shorten a URL for them.
+2. get_link_stats: Retrieve analytics for a specific link.
 
-Your job is to help users understand and use Zync effectively. Be concise, warm, and practical. Use simple language.
+CRITICAL: When returning text, format your response using Markdown! You can use bold, italics, bullet points, and code blocks for URLs.
 
-## About Zync
-Zync lets users shorten URLs, track click analytics, and use smart features.
+If the user asks you to shorten a link, immediately call \`create_link\`.
 
-## Core Features
+## Zync Features
+You must know how to explain these features to users if they ask:
+- **A/B Routing**: Splitting traffic between multiple destination URLs to test which one performs better.
+- **Time-Based Routing**: Redirecting users to different URLs based on the current time or day of the week.
+- **Device/OS Routing**: Sending iOS users to the App Store, Android users to the Play Store, and Desktop users to a web page.
+- **Geo-Routing**: Redirecting users to specific URLs based on their country or region.
+- **Meta-Tag Optimizer**: Using AI to generate rich preview images, titles, and descriptions for social media (WhatsApp, Twitter, etc.).
+- **Phishing Shield / Password Protection**: Securing links from malicious bots or unauthorized access using passwords.
+- **Custom Aliases**: Creating branded, recognizable short links instead of random characters.
 
-**Dashboard** (/dashboard)
-- View all your shortened links in a table
-- See total clicks, links created, and avg clicks per link
-- Click the chart icon to view analytics for a specific link
-- Click the pencil icon to edit a link
+## Conversation Context
+${history || "(start of conversation)"}`;
 
-**Create a New Link** (/dashboard/new)
-- Enter a destination URL (where the link will redirect)
-- Optionally set a custom alias (e.g. "my-promo") — leave blank for auto-generated
-- Click "Create Zync Link" to shorten it
-- The short link will be: [your-domain]/[alias]
-
-**Edit a Link** (/dashboard/edit/[id])
-- Change the destination URL or alias
-- Delete a link from the "Danger Zone" at the bottom
-
-**Analytics** (/link/[id])
-- View click activity chart — switchable between Today, 7 Days, 30 Days, All Time
-- Breakdown by referrer, device, and country
-- Chart starts from the day the link was created
-
-## Smart Features (in Create/Edit form)
-
-**🤖 Meta-Tag Optimizer**
-- Fixes the problem where short links lose their preview image/title on WhatsApp or Twitter
-- Click "Fetch from URL" to auto-fill the title, description, and thumbnail from the destination
-- Click "✨ AI Improve" to get AI-enhanced copy optimized for click-through rates
-- The preview data is stored and shown when bots scrape the short link
-
-**🔀 A/B Routing**
-- Send traffic to two different URLs randomly (e.g. 50/50 split)
-- Great for testing which landing page converts better
-- Set URL B and the traffic weight slider
-
-**⏰ Time-Based Redirects**
-- The link goes to different destinations depending on the time of day
-- Example: go to Shopee from 8am-12pm, then Tokopedia from 12pm-4pm
-- Click "Add time rule" and set the from/to time and destination URL
-
-**📱 Deep Linking**
-- Automatically detected — no setup needed
-- On mobile, YouTube/Instagram/TikTok/Spotify links open directly in the app instead of the browser
-
-**🛡️ Phishing Shield**
-- Automatically blocks suspicious or phishing URLs when you try to create a link
-- Powered by Gemini AI + heuristic rules
-
-## How Redirects Work
-When someone clicks your Zync link, they briefly see a loading screen and are instantly redirected. The short URL itself shows og: meta tags (title, description, image) to social platforms so previews look great.
-
-## Tips
-- You don't need to fill in Smart Features — they're all optional
-- The alias must be unique across all users
-- Click counts update in real-time on the dashboard and analytics page
-
-## Conversation History
-${history || "(start of conversation)"}
-
-User: ${userMessage}
-Nemo:`;
+// 1. Initial request to Gemini
+const geminiMessages: GeminiMessage[] = [
+    { role: "user", parts: [{ text: systemPrompt + "\n\nCurrent request: " + userMessage }] }
+];
 
 try {
-    const reply = await generate(systemPrompt, undefined, 20_000);
-    return new Response(JSON.stringify({ reply }), {
+    let part = await generateWithTools(geminiMessages, tools);
+
+    // 2. If Gemini wants to call a tool
+    if (part.functionCall) {
+        const call = part.functionCall;
+        const args = call.args || {};
+        let result: any = {};
+
+        // ----------------------------------------------------
+        // TOOL PRE-CHECK: User must be signed in 
+        // ----------------------------------------------------
+        if (!userId) {
+            result = { error: "User is not signed in. Tell them they need to log in to use agentic features." };
+        } 
+        
+        // ----------------------------------------------------
+        // TOOL: create_link
+        // ----------------------------------------------------
+        else if (call.name === "create_link") {
+            try {
+                // Ensure protocol
+                let url = args.original_url;
+                if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                    url = "https://" + url;
+                }
+                
+                // Fallback alias generation 
+                let alias = args.alias;
+                if (!alias) {
+                    const crypto = await import("crypto");
+                    alias = crypto.randomBytes(3).toString("hex");
+                }
+
+                const { data, error } = await supabase.from("links").insert({
+                    user_id: userId,
+                    alias,
+                    original_url: url
+                }).select().single();
+
+                if (error) {
+                    if (error.code === "23505") result = { error: "Alias is already taken." };
+                    else result = { error: error.message };
+                } else {
+                    const domain = new URL(Astro.request.url).origin;
+                    result = { success: true, short_url: `${domain}/${alias}`, message: "Link created successfully!" };
+                }
+            } catch (err: any) {
+                result = { error: err.message };
+            }
+        }
+        
+        // ----------------------------------------------------
+        // TOOL: get_link_stats
+        // ----------------------------------------------------
+        else if (call.name === "get_link_stats") {
+            try {
+                // 1. Get the link to verify ownership and get ID
+                const { data: link, error: linkErr } = await supabase
+                    .from("links")
+                    .select("id, original_url, created_at, clicks_count")
+                    .eq("alias", args.alias)
+                    .eq("user_id", userId)
+                    .single();
+
+                if (linkErr || !link) {
+                    result = { error: "Link not found or user does not own this link." };
+                } else {
+                    // 2. Get click details
+                    const { data: clicks } = await supabase
+                        .from("clicks")
+                        .select("*")
+                        .eq("link_id", link.id);
+
+                    const clickList = clicks || [];
+                    result = {
+                        success: true,
+                        alias: args.alias,
+                        destination: link.original_url,
+                        created_on: link.created_at,
+                        total_clicks: clickList.length,
+                        // quick aggregation
+                        devices: clickList.reduce((acc, c) => ({...acc, [c.device || 'unknown']: (acc[c.device || 'unknown'] || 0) + 1}), {}),
+                        countries: clickList.reduce((acc, c) => ({...acc, [c.country || 'unknown']: (acc[c.country || 'unknown'] || 0) + 1}), {})
+                    };
+                }
+            } catch (err: any) {
+                result = { error: err.message };
+            }
+        }
+
+        // 3. Send the tool result back to Gemini so it can answer the user natively
+        geminiMessages.push({ role: "model", parts: [{ functionCall: call }] });
+        geminiMessages.push({
+            role: "user",
+            parts: [{
+                functionResponse: {
+                    name: call.name,
+                    response: result
+                }
+            }]
+        });
+
+        part = await generateWithTools(geminiMessages, []); // Empty tools array on second turn
+    }
+
+    // 4. Return final text response
+    return new Response(JSON.stringify({ reply: part.text || "Done." }), {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" }
     });
+
 } catch (err) {
-    return new Response(
-        JSON.stringify({ error: (err as Error).message }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: (err as Error).message }), { status: 500 });
 }
----
+

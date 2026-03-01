@@ -40,27 +40,47 @@ Rules:
 - Title: max 60 characters, catchy and clear, no quotes
 - Description: max 155 characters, compelling but honest, no quotes
 - Keep the language matching the original (if Indonesian, stay Indonesian)
-- Reply ONLY in this exact JSON format, nothing else:
-{"title":"...", "description":"..."}`;
+- Provide ONLY a JSON object with "title" and "description" keys.`;
 
 try {
-    const response = await generate(prompt);
-    // Extract JSON from the response (model may add extra text)
-    const jsonMatch = response.match(/\{"title"[\s\S]*?\}/);
-    if (!jsonMatch) {
+    const responseText = await generate(prompt, undefined, 20000, {
+        responseMimeType: "application/json",
+        maxOutputTokens: 2048
+    });
+    
+    // With responseMimeType: application/json, it should be natively parseable
+    let improved;
+    try {
+        improved = JSON.parse(responseText);
+    } catch {
         return new Response(
-            JSON.stringify({ error: "Could not parse AI response. Try again." }),
+            JSON.stringify({ error: "AI returned invalid JSON structure.", details: responseText }),
             { status: 422, headers: { "Content-Type": "application/json" } }
         );
     }
-    const improved = JSON.parse(jsonMatch[0]);
+
+    // Fallback validation
+    if (!improved.title || !improved.description) {
+         return new Response(
+            JSON.stringify({ error: "AI JSON missing title or description.", details: responseText }),
+            { status: 422, headers: { "Content-Type": "application/json" } }
+        );
+    }
+
     return new Response(JSON.stringify(improved), {
         status: 200,
         headers: { "Content-Type": "application/json" },
     });
 } catch (err) {
+    const msg = (err as Error).message;
+    if (msg.startsWith("INCOMPLETE_GENERATION|")) {
+        return new Response(
+            JSON.stringify({ error: "Gemini truncated the response", raw_json: JSON.parse(msg.replace("INCOMPLETE_GENERATION|", "")) }),
+            { status: 502, headers: { "Content-Type": "application/json" } }
+        );
+    }
     return new Response(
-        JSON.stringify({ error: (err as Error).message }),
+        JSON.stringify({ error: msg }),
         { status: 500, headers: { "Content-Type": "application/json" } }
     );
 }

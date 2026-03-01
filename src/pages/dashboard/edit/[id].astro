@@ -7,9 +7,8 @@ import { checkUrl } from "../../../lib/phishing";
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
-const { data: { session } } = await supabase.auth.getSession();
-if (!session) return Astro.redirect("/login");
-const user = session.user;
+const { data: { user }, error: authError } = await supabase.auth.getUser();
+if (authError || !user) return Astro.redirect("/login");
 
 // ── Fetch link ────────────────────────────────────────────────────────────────
 const { id } = Astro.params;
@@ -222,11 +221,11 @@ if (Astro.request.method === "POST") {
                     lost.
                 </p>
             </div>
-            <form method="POST" action={`/api/links/${id}/delete`}>
+            <form id="delete-link-form" method="POST" action={`/api/links/${id}/delete`}>
                 <button
-                    type="submit"
-                    onclick="return confirm('Delete this link? All click data will be lost.')"
+                    type="button"
                     class="px-5 py-2.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 text-sm font-semibold hover:bg-red-500/20 hover:border-red-500/30 transition-all duration-150"
+                    onclick="handleDeleteLink(event)"
                 >
                     Delete Link
                 </button>
@@ -234,3 +233,21 @@ if (Astro.request.method === "POST") {
         </div>
     </main>
 </Layout>
+
+<script is:inline>
+    async function handleDeleteLink(e) {
+        e.preventDefault();
+        const form = document.getElementById("delete-link-form");
+        
+        const confirmed = await window.customConfirm({
+            title: "Delete Link",
+            description: "Are you sure you want to permanently delete this link? All analytics data will be lost. This cannot be undone.",
+            confirmText: "Yes, delete link",
+            type: "danger"
+        });
+
+        if (confirmed) {
+            form.submit();
+        }
+    }
+</script>

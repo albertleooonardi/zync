@@ -7,9 +7,8 @@ import BackButton from "../components/ui/BackButton.astro";
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
-const { data: { session } } = await supabase.auth.getSession();
-if (!session) return Astro.redirect("/login");
-const user = session.user;
+const { data: { user }, error: authError } = await supabase.auth.getUser();
+if (authError || !user) return Astro.redirect("/login");
 
 // ── Form state ────────────────────────────────────────────────────────────────
 let profileSuccess = "";
@@ -257,13 +256,28 @@ if (Astro.request.method === "POST") {
                         </div>
                         <button
                             type="button"
-                            onclick="confirm('Are you sure? All your links and data will be permanently deleted.') && alert('Account deletion coming soon.')"
+                            onclick="handleDeleteAccount()"
                             class="px-5 py-2.5 rounded-xl border border-pink/30 bg-pink/10 text-pink text-sm font-semibold hover:bg-pink/20 hover:border-pink/50 transition-all duration-150"
                         >
                             Delete Account
                         </button>
                     </div>
                 </section>
+
+                <script is:inline>
+                    async function handleDeleteAccount() {
+                        const confirmed = await window.customConfirm({
+                            title: "Delete Account",
+                            description: "Are you sure? All your links and data will be permanently deleted.",
+                            confirmText: "Delete",
+                            type: "danger"
+                        });
+                        
+                        if (confirmed) {
+                            window.showToast("Account deletion coming soon.", "warning");
+                        }
+                    }
+                </script>
 
                 <!-- ──────────────────────────────────────────────────────── -->
                 <!-- SECTION 2: Custom Domains                                -->
@@ -583,9 +597,9 @@ if (Astro.request.method === "POST") {
                                                             value={k.id}
                                                         />
                                                         <button
-                                                            type="submit"
+                                                            type="button"
                                                             class="px-3 py-1 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-xs hover:bg-red-500/20 transition-all"
-                                                            onclick="return confirm('Revoke this API key?')"
+                                                            onclick={`handleRevokeKey(event, 'revoke-form-${k.id}')`}
                                                         >
                                                             Revoke
                                                         </button>
@@ -619,15 +633,30 @@ if (Astro.request.method === "POST") {
     </div>
 </Layout>
 
-<script>
+<script is:inline>
     // Copy new API key button
     const copyBtn = document.getElementById("copy-api-key");
     const keyVal = document.getElementById("api-key-val");
     copyBtn?.addEventListener("click", async () => {
         await navigator.clipboard.writeText(keyVal?.textContent?.trim() ?? "");
         copyBtn.innerHTML = `<svg class="w-4 h-4 text-cyan" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`;
+        window.showToast("API Key copied to clipboard!");
         setTimeout(() => {
             copyBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`;
         }, 2000);
     });
+
+    async function handleRevokeKey(e, formId) {
+        e.preventDefault();
+        const confirmed = await window.customConfirm({
+            title: "Revoke API Key",
+            description: "Are you sure you want to revoke this API key? Any applications currently using it will immediately lose access.",
+            confirmText: "Revoke Key",
+            type: "danger"
+        });
+
+        if (confirmed) {
+            e.target.closest('form').submit();
+        }
+    }
 </script>

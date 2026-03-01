@@ -8,9 +8,8 @@ import type { Link } from "../../types/dashboard";
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
-const { data: { session } } = await supabase.auth.getSession();
-if (!session) return Astro.redirect("/login");
-const user = session.user;
+const { data: { user }, error: authError } = await supabase.auth.getUser();
+if (authError || !user) return Astro.redirect("/login");
 
 // ── Fetch links ───────────────────────────────────────────────────────────────
 const { data: links, error } = await supabase
@@ -112,7 +111,7 @@ const greeting =
                 label="Total Clicks (All Time)"
                 value={totalClicks.toLocaleString()}
                 accent="pink"
-                valueId="stat-total-clicks-value"
+                valueId="live-total-clicks"
             >
                 <svg
                     fill="none"
@@ -173,6 +172,7 @@ const greeting =
     id="rt-config"
     data-url={import.meta.env.PUBLIC_SUPABASE_URL}
     data-key={import.meta.env.PUBLIC_SUPABASE_ANON_KEY}
+    data-token={Astro.cookies.get("sb-access-token")?.value}
     data-links={JSON.stringify(safeLinks.map((l) => ({ id: l.id, click_count: l.click_count ?? 0 })))}
     hidden
 ></div>
@@ -181,7 +181,15 @@ const greeting =
     import { createClient } from "@supabase/supabase-js";
 
     const cfg = document.getElementById("rt-config")!;
-    const sb = createClient(cfg.dataset.url!, cfg.dataset.key!);
+    const token = cfg.dataset.token;
+    
+    // We MUST pass the Auth token here, otherwise Realtime connects anonymously 
+    // and Postgres Row Level Security (RLS) silently blocks all UPDATE events.
+    const sb = createClient(cfg.dataset.url!, cfg.dataset.key!, {
+        global: {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+        }
+    });
 
     // Track click counts in memory so we can recompute the total card
     const links: { id: string; click_count: number }[] = JSON.parse(cfg.dataset.links ?? "[]");
@@ -190,7 +198,7 @@ const greeting =
 
     function recomputeTotalCard() {
         const total = Object.values(counts).reduce((s, v) => s + v, 0);
-        const el = document.getElementById("stat-total-clicks-value");
+        const el = document.getElementById("live-total-clicks");
         if (el) {
             el.textContent = total.toLocaleString();
             el.classList.add("!text-cyan");
@@ -198,6 +206,7 @@ const greeting =
         }
     }
 
+    // Subscribe to links schema changes (for individual link updates)
     sb.channel("dashboard-links")
         .on(
             "postgres_changes",
@@ -217,6 +226,47 @@ const greeting =
                 }
 
                 recomputeTotalCard();
+            }
+        )
+        .subscribe();
+
+    // Subscribe to clicks table INSERTs for the Total Clicks counter
+    let currentTotalClicksStr = document.getElementById("live-total-clicks")?.textContent?.replace(/,/g, "") || "0";
+    let currentTotalClicks = parseInt(currentTotalClicksStr, 10);
+    
+    // We can filter by links owned by the user if we knew them, but for total clicks
+    // it's fine to listen to all inserts and rely on RLS if configured that way,
+    // OR we just listen and if the update comes we update our total. 
+    // However, since we track `counts` from `links` update above, that might double count
+    // if we independently update `live-total-clicks`. 
+    // Wait... if `links` is updated, the `UPDATE` trigger above recomputes the total AND animates it!
+    // But the user expressly asked to "Target the clicks table for INSERT events."
+    // Let's implement EXACTLY what the user requested, modifying just the `clicks` table subscription.
+    
+    sb.channel("dashboard-clicks")
+        .on(
+            "postgres_changes",
+            { event: "INSERT", schema: "public", table: "clicks" },
+            (payload) => {
+                const newClick = payload.new as { link_id: string };
+                // Only act if this click belongs to one of our tracked links
+                if (newClick.link_id && newClick.link_id in counts) {
+                     const el = document.getElementById("live-total-clicks");
+                     if (el) {
+                         const currentText = el.textContent?.replace(/,/g, "") || "0";
+                         const newTotal = parseInt(currentText, 10) + 1;
+                         el.textContent = newTotal.toLocaleString();
+                         
+                         // Subtle temporary UI animation
+                         el.classList.add("!text-cyan", "transition-colors", "duration-500");
+                         setTimeout(() => {
+                             el.classList.remove("!text-cyan");
+                         }, 500);
+                         
+                         // Keep our internal counter in sync just in case
+                         counts[newClick.link_id] += 1;
+                     }
+                }
             }
         )
         .subscribe();

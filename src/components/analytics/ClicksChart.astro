@@ -265,48 +265,51 @@ const { clicks, linkCreatedAt, totalClicks } = Astro.props;
         // ── Filter buttons ────────────────────────────────────────────────────
         const totalEl = document.getElementById("chart-total");
         const labelEl = document.getElementById("chart-range-label");
+        let activeRange = "30d";
 
         document
             .querySelectorAll<HTMLButtonElement>(".range-btn")
             .forEach((btn) => {
                 btn.addEventListener("click", () => {
-                    const range = btn.dataset.range!;
+                    activeRange = btn.dataset.range!;
 
                     // Active styling
                     document
                         .querySelectorAll<HTMLButtonElement>(".range-btn")
                         .forEach((b) => {
-                            b.classList.remove(
-                                "bg-cyan/15",
-                                "border-cyan/40",
-                                "text-cyan"
-                            );
-                            b.classList.add(
-                                "bg-white/5",
-                                "border-white/10",
-                                "text-muted"
-                            );
+                            b.classList.remove("bg-cyan/15", "border-cyan/40", "text-cyan");
+                            b.classList.add("bg-white/5", "border-white/10", "text-muted");
                         });
-                    btn.classList.remove(
-                        "bg-white/5",
-                        "border-white/10",
-                        "text-muted"
-                    );
+                    btn.classList.remove("bg-white/5", "border-white/10", "text-muted");
                     btn.classList.add("bg-cyan/15", "border-cyan/40", "text-cyan");
 
-                    const result = aggregateForRange(range);
-                    chart.data.labels = result.labels;
-                    chart.data.datasets[0].data = result.values;
-                    chart.update();
-
-                    if (totalEl)
-                        totalEl.textContent = result.total.toLocaleString();
-                    if (labelEl) labelEl.textContent = result.description;
+                    updateChartUI();
                 });
             });
 
-        // Update sub-label for initial 30d view
-        const initialResult = aggregateForRange("30d");
-        if (labelEl) labelEl.textContent = initialResult.description;
+        function updateChartUI() {
+            const result = aggregateForRange(activeRange);
+            chart.data.labels = result.labels;
+            chart.data.datasets[0].data = result.values;
+            chart.update();
+
+            if (totalEl) totalEl.textContent = result.total.toLocaleString();
+            if (labelEl) labelEl.textContent = result.description;
+        }
+
+        // Initial 30d view
+        updateChartUI();
+
+        // ── Live Realtime Updates ─────────────────────────────────────────────
+        window.addEventListener("new-click", (e) => {
+            const clickData = (e as CustomEvent).detail;
+            if (clickData && clickData.clicked_at) {
+                // Add the new timestamp to our raw data array
+                allTimestamps.push(clickData.clicked_at);
+                
+                // Re-aggregate and update the chart for the currently selected range
+                updateChartUI();
+            }
+        });
     };
 </script>

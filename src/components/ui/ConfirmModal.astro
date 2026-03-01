@@ -1,0 +1,117 @@
+---
+---
+
+<div id="global-confirm-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-midnight/80 backdrop-blur-sm opacity-0 transition-opacity duration-200">
+    <div class="relative w-full max-w-md transform scale-95 rounded-2xl bg-river border border-white/10 p-6 shadow-2xl transition-all duration-200 flex flex-col gap-4">
+        
+        <div id="confirm-modal-icon" class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0">
+            <!-- Outline/Icon injected via JS based on intent (danger/warning/info) -->
+        </div>
+
+        <div class="space-y-2 text-center sm:text-left">
+            <h3 id="confirm-modal-title" class="text-lg font-bold text-clean">Confirm Action</h3>
+            <p id="confirm-modal-desc" class="text-sm text-muted">Are you sure you want to proceed?</p>
+        </div>
+
+        <div class="mt-4 flex flex-col-reverse sm:flex-row gap-3 justify-end">
+            <button id="confirm-modal-cancel" class="px-5 py-2.5 rounded-xl border border-white/10 text-sm font-semibold text-muted hover:text-clean hover:bg-white/5 transition-all w-full sm:w-auto">
+                Cancel
+            </button>
+            <button id="confirm-modal-ok" class="px-5 py-2.5 rounded-xl text-sm font-bold text-midnight transition-all w-full sm:w-auto">
+                Confirm
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    export type ConfirmOptions = {
+        title: string;
+        description: string;
+        confirmText?: string;
+        cancelText?: string;
+        type?: "danger" | "warning" | "info";
+    };
+
+    let resolvePromise: ((value: boolean) => void) | null = null;
+
+    const modal = document.getElementById("global-confirm-modal");
+    const container = modal?.firstElementChild;
+    const titleEl = document.getElementById("confirm-modal-title");
+    const descEl = document.getElementById("confirm-modal-desc");
+    const okBtn = document.getElementById("confirm-modal-ok");
+    const cancelBtn = document.getElementById("confirm-modal-cancel");
+    const iconEl = document.getElementById("confirm-modal-icon");
+
+    window.customConfirm = function (options: ConfirmOptions): Promise<boolean> {
+        return new Promise((resolve) => {
+            if (!modal || !titleEl || !descEl || !okBtn || !cancelBtn || !iconEl || !container) {
+                resolve(false);
+                return;
+            }
+
+            titleEl.textContent = options.title;
+            descEl.textContent = options.description;
+            okBtn.textContent = options.confirmText || "Confirm";
+            cancelBtn.textContent = options.cancelText || "Cancel";
+
+            // Reset classes
+            okBtn.className = "px-5 py-2.5 rounded-xl text-sm font-bold text-midnight transition-all w-full sm:w-auto shadow-lg hover:opacity-90 active:scale-95";
+            iconEl.className = "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mb-2 sm:mb-0 sm:absolute sm:top-6 sm:left-6";
+            container.className = "relative w-full max-w-md transform scale-95 rounded-2xl bg-river border border-white/10 p-6 sm:pl-24 shadow-2xl transition-all duration-200 flex flex-col gap-2";
+
+            if (options.type === "danger") {
+                okBtn.classList.add("bg-red-500", "text-white", "shadow-red-500/20");
+                iconEl.classList.add("bg-red-500/10", "border", "border-red-500/20", "text-red-400");
+                iconEl.innerHTML = `<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>`;
+            } else if (options.type === "warning") {
+                okBtn.classList.add("bg-yellow-500", "text-midnight", "shadow-yellow-500/20");
+                iconEl.classList.add("bg-yellow-500/10", "border", "border-yellow-500/20", "text-yellow-400");
+                iconEl.innerHTML = `<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+            } else {
+                okBtn.classList.add("bg-cyan", "text-midnight", "shadow-cyan/20");
+                iconEl.classList.add("bg-cyan/10", "border", "border-cyan/20", "text-cyan");
+                iconEl.innerHTML = `<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+            }
+
+            resolvePromise = resolve;
+            
+            // Show modal
+            modal.classList.remove("hidden");
+            // Trigger reflow
+            void modal.offsetWidth;
+            modal.classList.remove("opacity-0");
+            container.classList.remove("scale-95");
+        });
+    };
+
+    function closeModal(result: boolean) {
+        if (!modal || !container) return;
+        
+        modal.classList.add("opacity-0");
+        container.classList.add("scale-95");
+        
+        setTimeout(() => {
+            modal.classList.add("hidden");
+            if (resolvePromise) {
+                resolvePromise(result);
+                resolvePromise = null;
+            }
+        }, 200);
+    }
+
+    okBtn?.addEventListener("click", () => closeModal(true));
+    cancelBtn?.addEventListener("click", () => closeModal(false));
+    modal?.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal(false);
+    });
+
+</script>
+
+<script>
+    declare global {
+        interface Window {
+            customConfirm: (options: any) => Promise<boolean>;
+        }
+    }
+</script>
