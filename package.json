@@ -15,8 +15,8 @@
     "@tailwindcss/vite": "^4.2.1",
     "astro": "^5.17.1",
     "marked": "^17.0.3",
-    "midtrans-client": "^1.4.3",
     "resend": "^6.9.3",
+    "stripe": "^20.4.0",
     "tailwindcss": "^4.2.1"
   }
 }

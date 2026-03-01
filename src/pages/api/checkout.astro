@@ -1,6 +1,6 @@
 ---
 import { createClient } from "@supabase/supabase-js";
-import midtransClient from "midtrans-client";
+import Stripe from "stripe";
 
 // Initialize Supabase Admin strictly for backend API
 const supabase = createClient(
@@ -26,8 +26,8 @@ try {
         });
     }
 
-    // Determine price based on plan
-    const gross_amount = plan === "creator" ? 99000 : 299000;
+    // Determine price based on plan (in USD cents: $9 and $29)
+    const gross_amount = plan === "creator" ? 900 : 2900;
 
     // Check Authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -39,44 +39,38 @@ try {
     const firstName = user?.user_metadata?.first_name || "Zync";
     const lastName = user?.user_metadata?.last_name || "User";
 
-    // Initialize Snap API
-    const snap = new midtransClient.Snap({
-        isProduction: false,
-        serverKey: import.meta.env.MIDTRANS_SERVER_KEY || 'SB-Mid-server-XXXXX',
-        clientKey: import.meta.env.PUBLIC_MIDTRANS_CLIENT_KEY || 'SB-Mid-client-XXXXX'
-    });
+    // Initialize Stripe API
+    const stripe = new Stripe(import.meta.env.STRIPE_SECRET_KEY || 'sk_test_XXXXX');
 
     // Create unique order ID
     const orderId = `zync-${plan}-${userId.substring(0,8)}-${Date.now()}`;
 
-    // Transaction Details
-    const parameter = {
-        transaction_details: {
-            order_id: orderId,
-            gross_amount: gross_amount
-        },
-        item_details: [{
-            id: `plan-${plan}`,
-            price: gross_amount,
+    // Create checkout session
+    const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        customer_email: email,
+        client_reference_id: userId,
+        line_items: [{
+            price_data: {
+                currency: 'usd',
+                product_data: {
+                    name: `Zync ${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan (1 Month)`,
+                },
+                unit_amount: gross_amount, // Amount in USD cents
+            },
             quantity: 1,
-            name: `Zync ${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan (1 Month)`
         }],
-        customer_details: {
-            first_name: firstName,
-            last_name: lastName,
-            email: email
-        },
-        // Custom field to pass the user ID and plan for the webhook to parse later
-        custom_field1: userId,
-        custom_field2: plan
-    };
-
-    // Create transaction token
-    const transaction = await snap.createTransaction(parameter);
+        mode: 'payment',
+        success_url: `${import.meta.env.PUBLIC_APP_URL || 'http://localhost:4321'}/dashboard?payment_success=true&order_id=${orderId}`,
+        cancel_url: `${import.meta.env.PUBLIC_APP_URL || 'http://localhost:4321'}/pricing?payment_failed=true&order_id=${orderId}`,
+        metadata: {
+             userId: userId,
+             plan: plan
+        }
+    });
 
     return new Response(JSON.stringify({ 
-        token: transaction.token,
-        redirect_url: transaction.redirect_url,
+        url: session.url,
         order_id: orderId
     }), {
         status: 200,
