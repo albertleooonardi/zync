@@ -35,7 +35,7 @@ function isValidUrl(str: string): boolean {
 // ── Form state ────────────────────────────────────────────────────────────────
 let fieldErrors: Record<string, string> = {};
 let formValues = { original_url: link.original_url, alias: link.alias };
-let successMessage = "";
+
 
 // ── POST handler ──────────────────────────────────────────────────────────────
 if (Astro.request.method === "POST") {
@@ -225,7 +225,7 @@ if (Astro.request.method === "POST") {
                 <button
                     type="button"
                     class="px-5 py-2.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 text-sm font-semibold hover:bg-red-500/20 hover:border-red-500/30 transition-all duration-150"
-                    onclick="handleDeleteLink(event)"
+                    onclick="handleDeleteLink(arguments[0])"
                 >
                     Delete Link
                 </button>

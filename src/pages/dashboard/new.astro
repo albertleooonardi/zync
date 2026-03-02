@@ -384,7 +384,7 @@ if (Astro.request.method === "POST") {
 
 
     <!-- Live alias preview + submit loading state -->
-    <script define:vars={{ suggestedAlias }}>
+    <script is:inline define:vars={{ suggestedAlias }}>
         const aliasInput = document.getElementById("alias");
         const previewAlias = document.getElementById("preview-alias");
         const form = document.getElementById("new-link-form");

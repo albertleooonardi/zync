@@ -2,7 +2,7 @@
 // POST /api/ai-meta
 // Body: { url: string, title: string, description: string }
 // Returns: { title: string, description: string } improved by Ollama
-import { generate, isAvailable } from "../../lib/gemini";
+import { generate, isAvailable } from "../../lib/groq";
 
 if (Astro.request.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
@@ -25,7 +25,7 @@ const { url = "", title = "", description = "" } = body;
 
 if (!isAvailable()) {
     return new Response(
-        JSON.stringify({ error: "GOOGLE_AI_API_KEY is not set. Get a free key at https://aistudio.google.com/app/apikey" }),
+        JSON.stringify({ error: "GROQ_AI_API_KEY is not set." }),
         { status: 503, headers: { "Content-Type": "application/json" } }
     );
 }
@@ -43,26 +43,32 @@ Rules:
 - Provide ONLY a JSON object with "title" and "description" keys.`;
 
 try {
-    const responseText = await generate(prompt, undefined, 20000, {
+    const responseText = await generate(prompt, undefined, {
         responseMimeType: "application/json",
-        maxOutputTokens: 2048
+        maxOutputTokens: 200,
     });
-    
+
     // With responseMimeType: application/json, it should be natively parseable
     let improved;
     try {
         improved = JSON.parse(responseText);
     } catch {
         return new Response(
-            JSON.stringify({ error: "AI returned invalid JSON structure.", details: responseText }),
+            JSON.stringify({
+                error: "AI returned invalid JSON structure.",
+                details: responseText,
+            }),
             { status: 422, headers: { "Content-Type": "application/json" } }
         );
     }
 
     // Fallback validation
     if (!improved.title || !improved.description) {
-         return new Response(
-            JSON.stringify({ error: "AI JSON missing title or description.", details: responseText }),
+        return new Response(
+            JSON.stringify({
+                error: "AI JSON missing title or description.",
+                details: responseText,
+            }),
             { status: 422, headers: { "Content-Type": "application/json" } }
         );
     }
@@ -72,16 +78,9 @@ try {
         headers: { "Content-Type": "application/json" },
     });
 } catch (err) {
-    const msg = (err as Error).message;
-    if (msg.startsWith("INCOMPLETE_GENERATION|")) {
-        return new Response(
-            JSON.stringify({ error: "Gemini truncated the response", raw_json: JSON.parse(msg.replace("INCOMPLETE_GENERATION|", "")) }),
-            { status: 502, headers: { "Content-Type": "application/json" } }
-        );
-    }
-    return new Response(
-        JSON.stringify({ error: msg }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: (err as Error).message }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+    });
 }
 ---

@@ -15,7 +15,7 @@ let profileSuccess = "";
 let profileError = "";
 let domainStatus: "idle" | "pending" | "verified" = "pending"; // mock
 let newApiKey = ""; // shown once after generation
-let apiKeyError = "";
+
 
 // Mock API keys for preview
 const mockApiKeys = [
@@ -599,7 +599,7 @@ if (Astro.request.method === "POST") {
                                                         <button
                                                             type="button"
                                                             class="px-3 py-1 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-xs hover:bg-red-500/20 transition-all"
-                                                            onclick={`handleRevokeKey(event, 'revoke-form-${k.id}')`}
+                                                            onclick="handleRevokeKey(arguments[0])"
                                                         >
                                                             Revoke
                                                         </button>
@@ -646,7 +646,7 @@ if (Astro.request.method === "POST") {
         }, 2000);
     });
 
-    async function handleRevokeKey(e, formId) {
+    async function handleRevokeKey(e) {
         e.preventDefault();
         const confirmed = await window.customConfirm({
             title: "Revoke API Key",

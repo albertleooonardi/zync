@@ -7,7 +7,7 @@
  * Returns { safe: boolean, reason: string }
  */
 
-import { generate, isAvailable } from "./gemini";
+import { generate, isAvailable } from "./groq";
 
 export interface PhishingResult {
     safe: boolean;
@@ -101,11 +101,12 @@ Rules:
 Your response:`;
 
     try {
-        const response = await generate(prompt);
-        const up = response.toUpperCase().trim();
+        let resultText = await generate(prompt, "llama-3.3-70b-versatile", { maxOutputTokens: 100 });
+        resultText = resultText.trim();
+        const up = resultText.toUpperCase();
         if (up.startsWith("UNSAFE")) {
-            const reason = response.includes(":")
-                ? response.split(":").slice(1).join(":").trim()
+            const reason = resultText.includes(":")
+                ? resultText.split(":").slice(1).join(":").trim()
                 : "Flagged as potentially unsafe by AI analysis.";
             return { safe: false, reason };
         }
@@ -113,7 +114,7 @@ Your response:`;
     } catch (err) {
         // AI unavailable — fail open (let the URL through)
         console.warn("[phishing] AI check skipped:", (err as Error).message);
-        return { safe: true, reason: "AI check skipped (Gemini unavailable)." };
+        return { safe: true, reason: "AI check skipped (Groq unavailable)." };
     }
 }
 

@@ -4,8 +4,9 @@
 // Returns: { reply: string }
 export const prerender = false;
 
-import { generateWithTools, type GeminiFunctionDeclaration, type GeminiMessage } from "../../lib/gemini";
+import { generateWithTools } from "../../lib/groq";
 import { createSupabaseAdminClient } from "../../lib/supabase";
+import { createClient } from "@supabase/supabase-js";
 
 if (Astro.request.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
@@ -18,25 +19,28 @@ let body: { messages?: Array<{ role: string; text: string }> };
 try {
     body = await Astro.request.json();
 } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
+    return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+        status: 400,
+    });
 }
 
 const reqMessages = body.messages ?? [];
 const userMessage = reqMessages[reqMessages.length - 1]?.text ?? "";
 
 if (!userMessage.trim()) {
-    return new Response(JSON.stringify({ error: "Empty message" }), { status: 400 });
+    return new Response(JSON.stringify({ error: "Empty message" }), {
+        status: 400,
+    });
 }
 
 // Ensure user is authenticated to perform agentic actions on their behalf
 const supabase = createSupabaseAdminClient();
 // We need the user's cookie to get their session
 const authFallback = Astro.cookies.get("sb-access-token")?.value;
-const authCookie = Astro.request.headers.get("cookie") || "";
+
 let userId: string | null = null;
 
 // Try to get user from token in cookies directly using Supabase anon client flow
-import { createClient } from "@supabase/supabase-js";
 const supaAnon = createClient(
     import.meta.env.PUBLIC_SUPABASE_URL,
     import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
@@ -48,82 +52,99 @@ if (authFallback) {
     userId = data.user?.id || null;
 }
 
-// Define the tools Gemini can use
-const tools: GeminiFunctionDeclaration[] = [
+const tools = [
     {
-        name: "create_link",
-        description: "Create a new shortened Zync link for the user. Call this when the user asks you to shorten a URL.",
-        parameters: {
-            type: "OBJECT",
-            properties: {
-                original_url: { type: "STRING", description: "The full destination URL (must start with http:// or https://)" },
-                alias: { type: "STRING", description: "Optional custom short alias (e.g. 'my-promo'). Leave empty for auto-generated." }
+        type: "function",
+        function: {
+            name: "create_link",
+            description:
+                "Create a new shortened Zync link for the user. Call this when the user asks you to shorten a URL.",
+            parameters: {
+                type: "object",
+                properties: {
+                    original_url: {
+                        type: "string",
+                        description:
+                            "The full destination URL (must start with http:// or https://)",
+                    },
+                    alias: {
+                        type: "string",
+                        description:
+                            "Optional custom short alias (e.g. 'my-promo'). Leave empty for auto-generated.",
+                    },
+                },
+                required: ["original_url"],
             },
-            required: ["original_url"]
-        }
+        },
     },
     {
-        name: "get_link_stats",
-        description: "Get the current analytics summary (clicks, creation date, top devices) for a specific shortened link.",
-        parameters: {
-            type: "OBJECT",
-            properties: {
-                alias: { type: "STRING", description: "The short alias of the link to fetch stats for (e.g. 'my-promo')" }
+        type: "function",
+        function: {
+            name: "get_link_stats",
+            description:
+                "Get the current analytics summary (clicks, creation date, top devices) for a specific shortened link.",
+            parameters: {
+                type: "object",
+                properties: {
+                    alias: {
+                        type: "string",
+                        description:
+                            "The short alias of the link to fetch stats for (e.g. 'my-promo')",
+                    },
+                },
+                required: ["alias"],
             },
-            required: ["alias"]
-        }
-    }
+        },
+    },
 ];
 
-// Build history context (last 6 turns limit)
-const history = reqMessages
-    .slice(-7, -1)
-    .map((m) => `${m.role === "user" ? "User" : "Nemo"}: ${m.text}`)
-    .join("\n");
+// Build history context (last 4 turns limit)
+const history = reqMessages.slice(-5, -1).map((m) => ({
+    role: m.role === "user" ? "user" : "assistant",
+    content: m.text,
+}));
 
-const systemPrompt = `You are Nemo, a helpful AI assistant built into Zync (a modern URL shortener).
-You can now ACT on behalf of the user using tools:
-1. create_link: Shorten a URL for them.
-2. get_link_stats: Retrieve analytics for a specific link.
+const systemPrompt = `You are Nemo, AI assistant for Zync (URL shortener).
+Tools:
+1. create_link: Shorten a URL. Use immediately if asked to shorten.
+2. get_link_stats: Get link clicks/stats.
 
-CRITICAL: When returning text, format your response using Markdown! You can use bold, italics, bullet points, and code blocks for URLs.
+Rule: Use Markdown (bold, code blocks). Be concise.
 
-If the user asks you to shorten a link, immediately call \`create_link\`.
+Zync Features:
+- A/B Routing: Split traffic between 2 URLs.
+- Time-Based Routing: Redirect by time/day.
+- Device/OS Routing: Redirect iOS to App Store, Android to Play Store, etc.
+- Geo-Routing: Redirect by country.
+- Meta-Tag Optimizer: AI generated preview for social media.
+- Phishing Shield: Block bad URLs & password protect.
+- Custom Aliases: Branded short links.`;
 
-## Zync Features
-You must know how to explain these features to users if they ask:
-- **A/B Routing**: Splitting traffic between multiple destination URLs to test which one performs better.
-- **Time-Based Routing**: Redirecting users to different URLs based on the current time or day of the week.
-- **Device/OS Routing**: Sending iOS users to the App Store, Android users to the Play Store, and Desktop users to a web page.
-- **Geo-Routing**: Redirecting users to specific URLs based on their country or region.
-- **Meta-Tag Optimizer**: Using AI to generate rich preview images, titles, and descriptions for social media (WhatsApp, Twitter, etc.).
-- **Phishing Shield / Password Protection**: Securing links from malicious bots or unauthorized access using passwords.
-- **Custom Aliases**: Creating branded, recognizable short links instead of random characters.
-
-## Conversation Context
-${history || "(start of conversation)"}`;
-
-// 1. Initial request to Gemini
-const geminiMessages: GeminiMessage[] = [
-    { role: "user", parts: [{ text: systemPrompt + "\n\nCurrent request: " + userMessage }] }
+// 1. Initial request to Groq
+const groqMessages: any[] = [
+    { role: "system", content: systemPrompt },
+    ...history,
+    { role: "user", content: userMessage },
 ];
 
 try {
-    let part = await generateWithTools(geminiMessages, tools);
+    let message = await generateWithTools(groqMessages, tools);
 
-    // 2. If Gemini wants to call a tool
-    if (part.functionCall) {
-        const call = part.functionCall;
-        const args = call.args || {};
+    // 2. If Groq wants to call a tool
+    if (message.tool_calls && message.tool_calls.length > 0) {
+        const call = message.tool_calls[0];
+        const args = JSON.parse(call.function.arguments || "{}");
         let result: any = {};
 
         // ----------------------------------------------------
-        // TOOL PRE-CHECK: User must be signed in 
+        // TOOL PRE-CHECK: User must be signed in
         // ----------------------------------------------------
         if (!userId) {
-            result = { error: "User is not signed in. Tell them they need to log in to use agentic features." };
-        } 
-        
+            result = {
+                error: "User is not signed in. Tell them they need to log in to use agentic features.",
+            };
+        }
+
         // ----------------------------------------------------
         // TOOL: create_link
         // ----------------------------------------------------
@@ -134,32 +155,37 @@ try {
                 if (!url.startsWith("http://") && !url.startsWith("https://")) {
                     url = "https://" + url;
                 }
-                
-                // Fallback alias generation 
+
+                // Fallback alias generation
                 let alias = args.alias;
                 if (!alias) {
                     const crypto = await import("crypto");
                     alias = crypto.randomBytes(3).toString("hex");
                 }
 
-                const { data, error } = await supabase.from("links").insert({
+                const { error } = await supabase.from("links").insert({
                     user_id: userId,
                     alias,
-                    original_url: url
-                }).select().single();
+                    original_url: url,
+                });
 
                 if (error) {
-                    if (error.code === "23505") result = { error: "Alias is already taken." };
+                    if (error.code === "23505")
+                        result = { error: "Alias is already taken." };
                     else result = { error: error.message };
                 } else {
                     const domain = new URL(Astro.request.url).origin;
-                    result = { success: true, short_url: `${domain}/${alias}`, message: "Link created successfully!" };
+                    result = {
+                        success: true,
+                        short_url: `${domain}/${alias}`,
+                        message: "Link created successfully!",
+                    };
                 }
             } catch (err: any) {
                 result = { error: err.message };
             }
         }
-        
+
         // ----------------------------------------------------
         // TOOL: get_link_stats
         // ----------------------------------------------------
@@ -174,7 +200,9 @@ try {
                     .single();
 
                 if (linkErr || !link) {
-                    result = { error: "Link not found or user does not own this link." };
+                    result = {
+                        error: "Link not found or user does not own this link.",
+                    };
                 } else {
                     // 2. Get click details
                     const { data: clicks } = await supabase
@@ -190,8 +218,22 @@ try {
                         created_on: link.created_at,
                         total_clicks: clickList.length,
                         // quick aggregation
-                        devices: clickList.reduce((acc, c) => ({...acc, [c.device || 'unknown']: (acc[c.device || 'unknown'] || 0) + 1}), {}),
-                        countries: clickList.reduce((acc, c) => ({...acc, [c.country || 'unknown']: (acc[c.country || 'unknown'] || 0) + 1}), {})
+                        devices: clickList.reduce(
+                            (acc, c) => ({
+                                ...acc,
+                                [c.device || "unknown"]:
+                                    (acc[c.device || "unknown"] || 0) + 1,
+                            }),
+                            {}
+                        ),
+                        countries: clickList.reduce(
+                            (acc, c) => ({
+                                ...acc,
+                                [c.country || "unknown"]:
+                                    (acc[c.country || "unknown"] || 0) + 1,
+                            }),
+                            {}
+                        ),
                     };
                 }
             } catch (err: any) {
@@ -199,28 +241,23 @@ try {
             }
         }
 
-        // 3. Send the tool result back to Gemini so it can answer the user natively
-        geminiMessages.push({ role: "model", parts: [{ functionCall: call }] });
-        geminiMessages.push({
-            role: "user",
-            parts: [{
-                functionResponse: {
-                    name: call.name,
-                    response: result
-                }
-            }]
+        // 3. Send the tool result back to Groq so it can answer the user natively
+        groqMessages.push(message);
+        groqMessages.push({
+            role: "tool",
+            tool_call_id: call.id,
+            name: call.function.name,
+            content: JSON.stringify(result),
         });
 
-        part = await generateWithTools(geminiMessages, []); // Empty tools array on second turn
+        message = await generateWithTools(groqMessages, []); // Empty tools array on second turn
     }
 
     // 4. Return final text response
-    return new Response(JSON.stringify({ reply: part.text || "Done." }), {
+    return new Response(JSON.stringify({ reply: message.content || "Done." }), {
         status: 200,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
     });
-
 } catch (err) {
-    return new Response(JSON.stringify({ error: (err as Error).message }), { status: 500 });
+    return new Response(JSON.stringify({ error: (err as Error).message }), {});
 }
-

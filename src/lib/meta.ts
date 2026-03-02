@@ -13,7 +13,7 @@ export interface MetaInfo {
 
 function extractMeta(html: string, url: URL): MetaInfo {
     // Helper: extract content of a meta tag by property or name
-    function getMeta(attr: string, value: string): string {
+    function getMeta(_attr: string, value: string): string {
         // <meta property="og:title" content="...">
         const re = new RegExp(
             `<meta[^>]+(?:property|name)=["']${value}["'][^>]+content=["']([^"']+)["']`,

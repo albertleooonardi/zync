@@ -3,6 +3,7 @@
 // Body: { url: string }
 // Returns: { title, description, image, siteName } | { error: string }
 import { fetchMeta } from "../../lib/meta";
+fetchMeta; // trick ts
 
 if (Astro.request.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
@@ -30,8 +31,7 @@ if (!url) {
 }
 
 try {
-    const meta = await fetchMeta(url);
-    return new Response(JSON.stringify(meta), {
+    return new Response(JSON.stringify(await fetchMeta(url)), {
         status: 200,
         headers: { "Content-Type": "application/json" },
     });

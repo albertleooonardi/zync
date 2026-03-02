@@ -100,8 +100,8 @@ await admin.from("clicks").insert({
 // ── Deep linking — detect known apps (mobile only) ────────────────────────────
 function getAppScheme(url: string): string | null {
     try {
-        const u = new URL(url);
-        const h = u.hostname.replace(/^www\./, "");
+
+
 
         // YouTube
         const ytMatch = url.match(/youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]+)/);
@@ -197,7 +197,7 @@ const pageUrl       = Astro.url.href;
         <p>Redirecting…</p>
         <a href={destinationUrl}>Click here if not redirected</a>
 
-        <script
+        <script is:inline
             define:vars={{
                 destUrl: destinationUrl,
                 appUrl: appScheme,

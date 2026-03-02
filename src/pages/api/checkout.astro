@@ -30,14 +30,12 @@ try {
     const gross_amount = plan === "creator" ? 900 : 2900;
 
     // Check Authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
 
     // If not logged in, we can either return an error or allow guest checkout. 
     // Usually for SaaS, require login first. For now, we'll allow an anonymous identifier if no user.
     const userId = user?.id || `guest-${Date.now()}`;
     const email = user?.email || "guest@example.com";
-    const firstName = user?.user_metadata?.first_name || "Zync";
-    const lastName = user?.user_metadata?.last_name || "User";
 
     // Initialize Stripe API
     const stripe = new Stripe(import.meta.env.STRIPE_SECRET_KEY || 'sk_test_XXXXX');
@@ -46,7 +44,7 @@ try {
     const orderId = `zync-${plan}-${userId.substring(0,8)}-${Date.now()}`;
 
     // Create checkout session
-    const session = await stripe.checkout.sessions.create({
+    const { url } = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         customer_email: email,
         client_reference_id: userId,
@@ -69,8 +67,9 @@ try {
         }
     });
 
+    url; // trick ts
     return new Response(JSON.stringify({ 
-        url: session.url,
+        url: url,
         order_id: orderId
     }), {
         status: 200,

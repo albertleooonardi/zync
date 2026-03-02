@@ -231,8 +231,7 @@ const greeting =
         .subscribe();
 
     // Subscribe to clicks table INSERTs for the Total Clicks counter
-    let currentTotalClicksStr = document.getElementById("live-total-clicks")?.textContent?.replace(/,/g, "") || "0";
-    let currentTotalClicks = parseInt(currentTotalClicksStr, 10);
+
     
     // We can filter by links owned by the user if we knew them, but for total clicks
     // it's fine to listen to all inserts and rely on RLS if configured that way,

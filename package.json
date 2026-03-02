@@ -9,14 +9,17 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/check": "^0.9.6",
     "@astrojs/node": "^9.5.4",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.98.0",
     "@tailwindcss/vite": "^4.2.1",
     "astro": "^5.17.1",
+    "groq-sdk": "^0.37.0",
     "marked": "^17.0.3",
     "resend": "^6.9.3",
     "stripe": "^20.4.0",
-    "tailwindcss": "^4.2.1"
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.9.3"
   }
 }
