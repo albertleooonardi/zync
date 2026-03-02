@@ -38,14 +38,14 @@ Current description: ${description || "(none)"}
 
 Rules:
 - Title: max 60 characters, catchy and clear, no quotes
-- Description: max 155 characters, compelling but honest, no quotes
+- Description: Write a detailed and engaging description (around 2-3 sentences, 200-300 characters), compelling but honest, no quotes
 - Keep the language matching the original (if Indonesian, stay Indonesian)
 - Provide ONLY a JSON object with "title" and "description" keys.`;
 
 try {
     const responseText = await generate(prompt, undefined, {
         responseMimeType: "application/json",
-        maxOutputTokens: 200,
+        maxOutputTokens: 400,
     });
 
     // With responseMimeType: application/json, it should be natively parseable
