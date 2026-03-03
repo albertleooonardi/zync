@@ -174,7 +174,9 @@ try {
                         result = { error: "Alias is already taken." };
                     else result = { error: error.message };
                 } else {
-                    const domain = new URL(Astro.request.url).origin;
+                    const host = Astro.request.headers.get("x-forwarded-host") || Astro.request.headers.get("host") || new URL(Astro.request.url).host;
+                    const protocol = Astro.request.headers.get("x-forwarded-proto") || "https";
+                    const domain = `${protocol}://${host}`;
                     result = {
                         success: true,
                         short_url: `${domain}/${alias}`,

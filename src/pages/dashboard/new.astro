@@ -205,9 +205,7 @@ if (Astro.request.method === "POST") {
                         <!-- Base URL prefix -->
                         <span
                             class="flex-shrink-0 px-4 py-3 text-sm text-muted border-r border-white/10 bg-white/5 whitespace-nowrap select-none"
-                        >
-                            {Astro.url.host}/
-                        </span>
+                            {Astro.request.headers.get("host") || Astro.url.host}/
                         <input
                             id="alias"
                             name="alias"
@@ -257,7 +255,7 @@ if (Astro.request.method === "POST") {
                             id="preview-url"
                             class="text-sm font-mono font-semibold text-cyan truncate"
                         >
-                            {Astro.url.host}/<span id="preview-alias"
+                            {Astro.request.headers.get("host") || Astro.url.host}/<span id="preview-alias"
                                 >{suggestedAlias}</span
                             >
                         </p>
