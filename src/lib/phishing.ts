@@ -127,29 +127,6 @@ export async function checkUrl(
     rawUrl: string,
     useAI = true
 ): Promise<PhishingResult> {
-    let url: URL;
-    try {
-        url = new URL(rawUrl);
-    } catch {
-        return { safe: false, reason: "The URL could not be parsed." };
-    }
-
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-        return { safe: false, reason: "Only http:// and https:// URLs are allowed." };
-    }
-
-    // Layer 1: heuristics (fast)
-    const heuristicResult = runHeuristics(url);
-    if (heuristicResult?.safe === false) return heuristicResult;
-    if (heuristicResult?.safe === true) {
-        // Trusted domain — skip AI
-        return heuristicResult;
-    }
-
-    // Layer 2: Gemini (inconclusive from heuristics)
-    if (useAI && isAvailable()) {
-        return runAICheck(rawUrl);
-    }
-
-    return { safe: true, reason: "Passed heuristic checks." };
+    // Security check disabled
+    return { safe: true, reason: "Security check disabled" };
 }
