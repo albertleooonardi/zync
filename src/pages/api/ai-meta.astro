@@ -30,15 +30,15 @@ if (!isAvailable()) {
     );
 }
 
-const prompt = `You are a social media copywriter. Improve the og:title and og:description for this link so it gets more clicks when shared on WhatsApp, Twitter, and Instagram.
+const prompt = `You are an expert, highly-engaging social media copywriter. Improve the og:title and og:description for this link so it gets MAXIMUM clicks when shared on WhatsApp, Twitter, and Instagram.
 
 URL: ${url}
 Current title: ${title || "(none)"}
 Current description: ${description || "(none)"}
 
 Rules:
-- Title: max 60 characters, catchy and clear, no quotes
-- Description: Write a detailed and engaging description (around 2-3 sentences, 200-300 characters), compelling but honest, no quotes
+- Title: max 60 characters, catchy and clear, no quotes. Use 1 relevant emoji.
+- Description: Write a detailed, highly engaging description (around 2-3 sentences, 200-300 characters). Make it irresistible to click! Use 2-3 relevant emojis to make it pop! No quotes.
 - Keep the language matching the original (if Indonesian, stay Indonesian)
 - Provide ONLY a JSON object with "title" and "description" keys.`;
 
