@@ -1,0 +1,112 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import { createSupabaseServerClient } from "../../../lib/supabase";
+import DashboardNav from "../../../components/dashboard/DashboardNav.astro";
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+const supabase = createSupabaseServerClient(Astro.request, Astro.cookies);
+const { data: { user }, error: authError } = await supabase.auth.getUser();
+if (authError || !user) return Astro.redirect("/login");
+
+const alias = Astro.url.searchParams.get("alias") ?? "";
+if (!alias) return Astro.redirect("/dashboard");
+
+const shortUrl = `${Astro.url.origin}/${alias}`;
+---
+
+<Layout title="Link Created — Zync" description="Your Zync short link is ready.">
+    <DashboardNav userEmail={user.email} />
+
+    <main class="mx-auto max-w-xl px-4 sm:px-6 lg:px-8 py-24 flex flex-col items-center gap-8">
+        <!-- Success icon -->
+        <div class="w-20 h-20 rounded-full bg-cyan/15 border border-cyan/30 flex items-center justify-center shadow-[0_0_40px_rgba(6,182,212,0.25)]">
+            <svg class="w-10 h-10 text-cyan" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+        </div>
+
+        <div class="text-center space-y-2">
+            <h1 class="text-3xl font-black text-clean">🎉 Link Created!</h1>
+            <p class="text-muted text-sm">Your short link is live and ready to share.</p>
+        </div>
+
+        <!-- Short URL display -->
+        <div class="w-full rounded-2xl bg-river border border-white/5 p-6 space-y-4">
+            <p class="text-xs text-muted uppercase tracking-widest font-semibold">Your short link</p>
+            <div class="flex items-center gap-3 rounded-xl bg-midnight border border-cyan/20 px-4 py-3">
+                <span class="text-lg">🔗</span>
+                <a
+                    href={shortUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    id="short-url-display"
+                    class="flex-1 min-w-0 text-sm font-mono font-bold text-cyan truncate hover:underline"
+                >
+                    {shortUrl}
+                </a>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="grid grid-cols-2 gap-3">
+                <button
+                    id="copy-btn"
+                    type="button"
+                    class="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-cyan/10 border border-cyan/20 text-sm font-semibold text-cyan hover:bg-cyan/20 transition-all duration-150"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <span id="copy-label">Copy Link</span>
+                </button>
+                <a
+                    href={shortUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm font-semibold text-clean hover:bg-white/10 transition-all duration-150"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Open Link
+                </a>
+            </div>
+        </div>
+
+        <!-- Nav buttons -->
+        <div class="flex w-full gap-3">
+            <a
+                href="/dashboard/new"
+                class="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-sm font-semibold text-muted hover:text-clean hover:bg-white/10 text-center transition-all"
+            >
+                + Create Another
+            </a>
+            <a
+                href="/dashboard"
+                class="flex-1 py-3 rounded-xl bg-cyan hover:bg-cyan/90 text-midnight font-bold text-sm text-center transition-all shadow-[0_0_20px_rgba(6,182,212,0.35)]"
+            >
+                Go to Dashboard
+            </a>
+        </div>
+    </main>
+
+    <script is:inline>
+        const btn = document.getElementById("copy-btn");
+        const label = document.getElementById("copy-label");
+        const url = document.getElementById("short-url-display")?.textContent?.trim();
+
+        btn?.addEventListener("click", async () => {
+            if (!url) return;
+            try {
+                await navigator.clipboard.writeText(url);
+                label.textContent = "Copied!";
+                btn.classList.add("bg-green-500/10", "border-green-500/30", "text-green-400");
+                setTimeout(() => {
+                    label.textContent = "Copy Link";
+                    btn.classList.remove("bg-green-500/10", "border-green-500/30", "text-green-400");
+                }, 2000);
+            } catch {
+                label.textContent = "Failed";
+            }
+        });
+    </script>
+</Layout>

@@ -1,35 +1,65 @@
-# 🔗 Zync - Modern URL Shortener & Link Management
+# 🔗 Zync — Modern URL Shortener & Intelligent Link Management
 
-Welcome to **Zync**, a powerful, modern, and intelligent URL shortener built with [Astro](https://astro.build) and [Supabase](https://supabase.com). Zync goes beyond simple link shortening by offering advanced routing, in-depth analytics, and a built-in AI assistant.
+<div align="center">
+
+**Zync** is a full-featured, production-ready URL shortener built with [Astro](https://astro.build) and [Supabase](https://supabase.com). It goes far beyond simple link shortening — with smart routing, real-time analytics, AI-powered features, and an interactive AI assistant named **Nemo 🐠**.
+
+[![Built with Astro](https://img.shields.io/badge/Built%20with-Astro-FF5D01?logo=astro&logoColor=white)](https://astro.build)
+[![Powered by Supabase](https://img.shields.io/badge/Powered%20by-Supabase-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
+[![AI by Groq](https://img.shields.io/badge/AI%20by-Groq-F55036?logo=groq&logoColor=white)](https://groq.com)
+
+</div>
 
 ---
 
-## ✨ Key Features
+## ✨ Features
 
-Zync is packed with features designed for marketers, developers, and everyday users who need more control over their links.
+### 🔗 Core Link Management
+| Feature | Description |
+|---|---|
+| **URL Shortening** | Instantly shorten any `http://` or `https://` URL into a clean, compact link |
+| **Custom Aliases** | Create branded short links like `zync.id/my-campaign` instead of random characters |
+| **Phishing Shield 🛡️** | AI-powered heuristic scanner that blocks malicious/phishing URLs before they can be shortened |
+| **Password Protection 🔒** | Lock individual links behind a password so only authorized people can access the destination |
 
-*   **🐠 Nemo AI Assistant:** A built-in, floating AI chatbot (powered by Groq) that can answer your questions, shorten links on your behalf, and fetch analytics right from the chat window!
-*   **🔀 A/B Routing:** Test the performance of different landing pages by splitting traffic between multiple destination URLs.
-*   **🕒 Time-Based Routing:** Automatically redirect users to different URLs depending on the day of the week or time of day. Perfect for time-sensitive campaigns.
-*   **📱 Device/OS Routing:** Smart routing that sends iOS users to the App Store, Android users to the Play Store, and Desktop users to a specific web page.
-*   **🌍 Geo-Routing:** Redirect users to geographically relevant URLs based on their country.
-*   **🛡️ Phishing Shield & Password Protection:** Zync uses heuristics and AI analysis to block malicious URLs. You can also lock your sensitive links behind a password. 🔒
-*   **🖼️ Meta-Tag Optimizer:** Leverage AI to generate optimized OpenGraph titles, descriptions, and preview images so your links look perfect when shared on social media.
-*   **🏷️ Custom Aliases:** Create memorable, branded short links (e.g., `zync.com/my-campaign`) instead of random character strings.
-*   **📊 In-Depth Analytics:** Track clicks, referrers, devices, operating systems, and geographic locations with beautiful, real-time charts.
+### 📊 Analytics & Tracking
+| Feature | Description |
+|---|---|
+| **Click Tracking** | Every click on a Zync link is logged in real-time |
+| **Device & OS Breakdown** | See which devices (Mobile, Desktop, Tablet) and operating systems are clicking your links |
+| **Geographic Analytics** | Country-level breakdown of your link traffic |
+| **Referrer Tracking** | Know where your traffic is coming from (social media, direct, other sites) |
+| **Time-Series Charts** | Beautiful click-over-time graphs |
+
+### 🧠 Smart Routing
+> One link, infinite flexibility. Configure rules to redirect different visitors to different destinations based on conditions.
+
+| Rule Type | Description |
+|---|---|
+| **🔀 A/B Routing** | Split traffic between two URLs (e.g., 70/30) to run experiments and find which page converts better |
+| **⏰ Time-Based Routing** | Automatically redirect users to different URLs based on the time of day or day of the week. Great for flash sales or event-specific campaigns |
+| **📱 Device/OS Routing** | Send iOS users to the App Store, Android users to the Play Store, and Desktop users to your website — all from one smart link |
+| **🌍 Geo-Routing** | Redirect visitors to country-specific pages. Perfect for international campaigns or serving localized content |
+
+### 🤖 AI Features
+| Feature | Description |
+|---|---|
+| **Nemo AI Assistant 🐠** | A floating AI chatbot (powered by Groq's Llama 3) that can answer questions, shorten links, and pull up analytics — all from the chat window |
+| **Meta-Tag Optimizer** | AI generates optimized OpenGraph `title`, `description`, and preview images so links look stunning on WhatsApp, Twitter, Instagram, and more |
 
 ---
 
 ## 🚀 Getting Started
 
-Follow these steps to get Zync up and running locally.
-
 ### Prerequisites
-*   [Node.js](https://nodejs.org/) (v18 or higher)
-*   A [Supabase](https://supabase.com) account & project
-*   A [Groq API Key](https://console.groq.com/keys) (for the Nemo AI & Phishing Shield)
-*   (Optional) A [Resend API Key](https://resend.com/) for email features
-*   (Optional) A [Stripe API Key](https://stripe.com/) for billing/subscriptions
+Before you begin, make sure you have these installed/available:
+- [Node.js](https://nodejs.org/) **v18 or higher**
+- A [Supabase](https://supabase.com) account and project
+- A [Groq API Key](https://console.groq.com/keys) (free tier available – powers Nemo AI and Phishing Shield)
+- *(Optional)* A [Resend API Key](https://resend.com/) for email features
+- *(Optional)* A [Stripe API Key](https://stripe.com/) for billing/subscriptions
+
+---
 
 ### 1. Clone the Repository
 ```bash
@@ -42,66 +72,127 @@ cd zync
 npm install
 ```
 
-### 3. Environment Variables
-Create a `.env` file in the root directory and add the following keys. 
+### 3. Configure Environment Variables
+Create a `.env` file in the project root and populate it with the following:
 
 ```env
-# Supabase Configuration
-PUBLIC_SUPABASE_URL=your_supabase_project_url
+# ── Supabase ────────────────────────────────────────────────────────────────
+PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
-# AI Client (Groq)
-GROQ_AI_API_KEY=your_groq_api_key
-# Optional: Override the default Groq model
+# ── AI (Groq) ────────────────────────────────────────────────────────────────
+# Get a free key at: https://console.groq.com/keys
+GROQ_AI_API_KEY=gsk_...
+# Optional: Override the default model (default: llama-3.3-70b-versatile)
 # GROQ_MODEL=llama-3.3-70b-versatile
 
-# Other Services (Optional for basic running)
-RESEND_API_KEY=your_resend_api_key
-STRIPE_SECRET_KEY=your_stripe_secret_key
+# ── Email (Resend) ───────────────────────────────────────────────────────────
+# Optional – needed for email invitations and notifications
+RESEND_API_KEY=re_...
+
+# ── Billing (Stripe) ─────────────────────────────────────────────────────────
+# Optional – needed for subscription plans
+STRIPE_SECRET_KEY=sk_...
 ```
 
+> [!IMPORTANT]
+> Never commit your `.env` file to version control. It's already in `.gitignore`.
+
+---
+
 ### 4. Database Setup (Supabase)
-Ensure your Supabase database has the required tables. You will need:
-*   `links` table (for storing URL mappings, rules, and passwords)
-*   `clicks` table (for tracking analytics)
-*(Note: Check the `/supabase/migrations` folder if applicable for SQL schema definitions).*
+
+Apply the SQL migrations found in the `/supabase/migrations/` folder to your Supabase project. The core tables are:
+
+- **`links`** — Stores all shortened links, their destinations, smart routing rules, OG metadata, and password hashes.
+- **`clicks`** — Append-only table that logs every click event with device, OS, country, and referrer data.
+
+You can run the migrations via the [Supabase SQL Editor](https://supabase.com/dashboard) or the Supabase CLI:
+```bash
+supabase db push
+```
+
+---
 
 ### 5. Run the Development Server
 ```bash
 npm run dev
 ```
-The application will be available at `http://localhost:4321`.
+Visit `http://localhost:4321` to see your local Zync instance.
 
 ---
 
 ## 🛠️ Tech Stack
 
-*   **Framework:** [Astro](https://astro.build/) (Server-Side Rendered)
-*   **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
-*   **Database & Auth:** [Supabase](https://supabase.com/)
-*   **AI Engine:** [Groq](https://groq.com/) (Llama 3 models)
-*   **Markdown Parsing:** `marked`
-*   **Icons:** Custom SVG / Emojis
+| Layer | Technology |
+|---|---|
+| **Framework** | [Astro](https://astro.build/) (Server-Side Rendered, Node.js adapter) |
+| **Styling** | [Tailwind CSS v4](https://tailwindcss.com/) |
+| **Database & Auth** | [Supabase](https://supabase.com/) (PostgreSQL + Row Level Security) |
+| **AI Engine** | [Groq](https://groq.com/) with Llama 3.3 70B |
+| **Payments** | [Stripe](https://stripe.com/) |
+| **Email** | [Resend](https://resend.com/) |
+| **Markdown Parsing** | `marked` (for Nemo's rich text responses) |
 
 ---
 
-## 🧞 Astro Commands
+## 📁 Project Structure
 
-All commands are run from the root of the project:
+```
+/
+├── public/              # Static assets (favicon, etc.)
+├── src/
+│   ├── components/      # Reusable Astro components
+│   │   ├── analytics/   # Analytics chart components
+│   │   ├── dashboard/   # Dashboard navigation & UI
+│   │   └── ui/          # Generic UI primitives
+│   ├── layouts/         # Page layout wrappers
+│   ├── lib/             # Server-side utilities
+│   │   ├── groq.ts      # Groq AI client (chat, meta-optimization, phishing)
+│   │   ├── phishing.ts  # URL safety scanner (heuristics + AI)
+│   │   ├── supabase.ts  # Supabase server & client helpers
+│   │   └── meta.ts      # OpenGraph metadata fetcher
+│   ├── pages/
+│   │   ├── api/         # API route handlers (chat, ai-meta, checkout, etc.)
+│   │   ├── dashboard/   # Dashboard pages (new link, edit, analytics)
+│   │   └── [alias].astro # The core redirect handler
+│   └── types/           # TypeScript type definitions
+├── supabase/
+│   └── migrations/      # SQL migration files
+└── astro.config.mjs
+```
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
+---
+
+## 🔌 API Routes
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/chat` | Nemo AI chat endpoint (supports tool calling) |
+| `POST` | `/api/ai-meta` | AI-powered OpenGraph meta-tag improvement |
+| `POST` | `/api/fetch-meta` | Scrape OG meta tags from a URL |
+| `POST` | `/api/checkout` | Stripe checkout session creation |
+| `GET/POST` | `/[alias]` | The core redirect handler with all routing logic |
+
+---
+
+## 🧞 Commands
+
+| Command | Action |
+|---|---|
+| `npm install` | Install all dependencies |
+| `npm run dev` | Start local dev server at `localhost:4321` |
+| `npm run build` | Build production site to `./dist/` |
+| `npm run preview` | Preview the production build locally |
+| `npx astro check` | Run TypeScript checks on all Astro files |
 
 ---
 
 ## 🤝 Contributing
-Contributions, issues, and feature requests are welcome! 
+
+Contributions, issues, and feature requests are welcome! Please open an issue to discuss major changes first.
 
 ## 📝 License
-This project is open-source and available under the MIT License.
+
+This project is open-source and available under the **MIT License**.

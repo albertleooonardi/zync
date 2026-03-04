@@ -97,7 +97,7 @@ if (Astro.request.method === "POST") {
                 errorMessage = dbError.message;
             }
         } else {
-            return Astro.redirect(`/dashboard?created=${encodeURIComponent(finalAlias)}`);
+            return Astro.redirect(`/dashboard/new/created?alias=${encodeURIComponent(finalAlias)}`);
         }
     }
 }
@@ -205,7 +205,8 @@ if (Astro.request.method === "POST") {
                         <!-- Base URL prefix -->
                         <span
                             class="flex-shrink-0 px-4 py-3 text-sm text-muted border-r border-white/10 bg-white/5 whitespace-nowrap select-none"
-                            {Astro.request.headers.get("host") || Astro.url.host}/
+                            >zync.id/
+                        </span>
                         <input
                             id="alias"
                             name="alias"
@@ -255,7 +256,7 @@ if (Astro.request.method === "POST") {
                             id="preview-url"
                             class="text-sm font-mono font-semibold text-cyan truncate"
                         >
-                            {Astro.request.headers.get("host") || Astro.url.host}/<span id="preview-alias"
+                         zync.id/<span id="preview-alias"
                                 >{suggestedAlias}</span
                             >
                         </p>
