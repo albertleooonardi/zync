@@ -11,7 +11,8 @@ if (authError || !user) return Astro.redirect("/login");
 const alias = Astro.url.searchParams.get("alias") ?? "";
 if (!alias) return Astro.redirect("/dashboard");
 
-const shortUrl = `https://zync.id/${alias}`;
+const siteUrl = import.meta.env.PUBLIC_SITE_URL || Astro.url.origin;
+const shortUrl = `${siteUrl}/${alias}`;
 ---
 
 <Layout title="Link Created — Zync" description="Your Zync short link is ready.">

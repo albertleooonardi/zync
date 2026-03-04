@@ -189,9 +189,10 @@ try {
                         result = { error: "Alias is already taken." };
                     else result = { error: error.message };
                 } else {
+                    const siteUrl = import.meta.env.PUBLIC_SITE_URL || new URL(Astro.request.url).origin;
                     result = {
                         success: true,
-                        short_url: `https://zync.id/${alias}`,
+                        short_url: `${siteUrl}/${alias}`,
                         message: "Link created successfully!",
                     };
                 }
