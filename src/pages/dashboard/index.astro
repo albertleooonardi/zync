@@ -31,6 +31,7 @@ const topLink = safeLinks.reduce<Link | null>(
 );
 
 const baseUrl = import.meta.env.PUBLIC_SITE_URL || Astro.url.origin;
+const displayUrl = import.meta.env.PUBLIC_DISPLAY_URL || baseUrl;
 const createdAlias = Astro.url.searchParams.get("created");
 
 // Time-aware greeting
@@ -162,7 +163,7 @@ const greeting =
                     )
                 }
             </div>
-            <LinksTable links={safeLinks} baseUrl={baseUrl} />
+            <LinksTable links={safeLinks} baseUrl={baseUrl} displayUrl={displayUrl} />
         </section>
     </main>
 </Layout>

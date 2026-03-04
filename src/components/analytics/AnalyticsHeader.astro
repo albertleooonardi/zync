@@ -3,10 +3,11 @@ interface Props {
     alias: string;
     originalUrl: string;
     shortUrl: string;
+    displayShortUrl?: string;
     linkId: string;
 }
 
-const { originalUrl, shortUrl, linkId } = Astro.props;
+const { originalUrl, shortUrl, displayShortUrl = shortUrl, linkId } = Astro.props;
 ---
 
 <div class="space-y-4">
@@ -26,7 +27,7 @@ const { originalUrl, shortUrl, linkId } = Astro.props;
         <div class="min-w-0">
             <h1 class="text-3xl font-black text-clean flex items-center gap-2 flex-wrap">
                 <span class="bg-gradient-to-r from-cyan to-pink bg-clip-text text-transparent font-mono">
-                    {shortUrl}
+                    {displayShortUrl}
                 </span>
             </h1>
             <p class="text-sm text-muted mt-1 truncate max-w-xl" title={originalUrl}>

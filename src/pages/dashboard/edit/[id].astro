@@ -168,7 +168,7 @@ if (Astro.request.method === "POST") {
                         <span
                             class="flex-shrink-0 px-4 py-3 text-sm text-muted border-r border-white/10 bg-white/5 whitespace-nowrap select-none"
                         >
-                            {(import.meta.env.PUBLIC_SITE_URL || Astro.url.origin).replace(/^https?:\/\//, "")}/
+                            {(import.meta.env.PUBLIC_DISPLAY_URL || import.meta.env.PUBLIC_SITE_URL || Astro.url.origin).replace(/^https?:\/\//, "")}/
                         </span>
                         <input
                             id="alias"

@@ -12,7 +12,9 @@ const alias = Astro.url.searchParams.get("alias") ?? "";
 if (!alias) return Astro.redirect("/dashboard");
 
 const siteUrl = import.meta.env.PUBLIC_SITE_URL || Astro.url.origin;
+const displayUrl = import.meta.env.PUBLIC_DISPLAY_URL || siteUrl;
 const shortUrl = `${siteUrl}/${alias}`;
+const displayShortUrl = `${displayUrl}/${alias}`;
 ---
 
 <Layout title="Link Created — Zync" description="Your Zync short link is ready.">
@@ -43,7 +45,7 @@ const shortUrl = `${siteUrl}/${alias}`;
                     id="short-url-display"
                     class="flex-1 min-w-0 text-sm font-mono font-bold text-cyan truncate hover:underline"
                 >
-                    {shortUrl}
+                    {displayShortUrl}
                 </a>
             </div>
 

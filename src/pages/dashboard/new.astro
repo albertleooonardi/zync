@@ -34,6 +34,7 @@ let fieldErrors: Record<string, string> = {};
 let formValues = { original_url: "", alias: "" };
 const suggestedAlias = randomAlias();
 const siteHost = (import.meta.env.PUBLIC_SITE_URL || Astro.url.origin).replace(/^https?:\/\//, "");
+const displayHost = (import.meta.env.PUBLIC_DISPLAY_URL || import.meta.env.PUBLIC_SITE_URL || Astro.url.origin).replace(/^https?:\/\//, "");
 
 // ── POST handler ──────────────────────────────────────────────────────────────
 if (Astro.request.method === "POST") {
@@ -206,7 +207,7 @@ if (Astro.request.method === "POST") {
                         <!-- Base URL prefix -->
                         <span
                             class="flex-shrink-0 px-4 py-3 text-sm text-muted border-r border-white/10 bg-white/5 whitespace-nowrap select-none"
-                            >{siteHost}/
+                            >{displayHost}/
                         </span>
                         <input
                             id="alias"
@@ -257,7 +258,7 @@ if (Astro.request.method === "POST") {
                             id="preview-url"
                             class="text-sm font-mono font-semibold text-cyan truncate"
                         >
-                         {siteHost}/<span id="preview-alias"
+                         {displayHost}/<span id="preview-alias"
                                 >{suggestedAlias}</span
                             >
                         </p>

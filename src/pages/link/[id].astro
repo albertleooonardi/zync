@@ -121,7 +121,9 @@ const devices = buildDevices();
 const geoData = buildGeo();
 const totalClicks = safeClicks.length;
 const siteUrl = (import.meta.env.PUBLIC_SITE_URL || Astro.url.origin).replace(/\/$/, "");
+const displayUrl = (import.meta.env.PUBLIC_DISPLAY_URL || siteUrl).replace(/\/$/, "");
 const shortUrl = `${siteUrl}/${link.alias}`;
+const displayShortUrl = `${displayUrl}/${link.alias}`;
 ---
 
 <Layout
@@ -137,6 +139,7 @@ const shortUrl = `${siteUrl}/${link.alias}`;
             alias={link.alias}
             originalUrl={link.original_url}
             shortUrl={shortUrl}
+            displayShortUrl={displayShortUrl}
             linkId={link.id}
         />
 

@@ -3,10 +3,13 @@ import type { Link } from "../../types/dashboard";
 
 interface Props {
     links: Link[];
-    baseUrl: string;
+    baseUrl: string;      // actual working URL (href)
+    displayUrl?: string;  // cosmetic display text (shown to user)
 }
 
-const { links, baseUrl } = Astro.props;
+const { links, baseUrl, displayUrl = baseUrl } = Astro.props;
+const displayHost = displayUrl.replace(/^https?:\/\//, "");
+
 
 function formatDate(iso: string): string {
     return new Date(iso).toLocaleDateString("en-US", {
@@ -87,9 +90,10 @@ function truncate(str: string, n: number) {
                                         href={`${baseUrl}/${link.alias}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        class="text-cyan font-mono font-semibold hover:text-cyan/80 transition-colors"
+                                        class="text-cyan font-mono font-semibold hover:text-cyan/80 transition-colors flex items-center gap-1 group/link"
+                                        title={`${displayUrl}/${link.alias}`}
                                     >
-                                        {link.alias}
+                                        <span class="text-muted/50 text-xs">{displayHost}/</span>{link.alias}
                                     </a>
                                 </td>
                                 <td class="px-5 py-4 max-w-[240px]">
