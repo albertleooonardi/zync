@@ -1,66 +1,106 @@
 ---
-interface DeviceItem {
-    name: string;
-    count: number;
-    percent: number;
-}
-
-interface Props {
-    devices: DeviceItem[];
-}
-
+interface DeviceItem { name: string; count: number; percent: number; }
+interface Props { devices: DeviceItem[]; }
 const { devices } = Astro.props;
 
 const iconMap: Record<string, string> = {
-    mobile: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 15.75h3" /></svg>`,
+    mobile:  `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 15.75h3" /></svg>`,
     desktop: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0H3" /></svg>`,
-    tablet: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5h3m-6.75 2.25h10.5a2.25 2.25 0 002.25-2.25v-15a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 4.5v15a2.25 2.25 0 002.25 2.25z" /></svg>`,
+    tablet:  `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5h3m-6.75 2.25h10.5a2.25 2.25 0 002.25-2.25v-15a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 4.5v15a2.25 2.25 0 002.25 2.25z" /></svg>`,
     unknown: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>`,
 };
 ---
 
 <div class="rounded-2xl bg-river border border-white/5 p-5 space-y-4 h-full">
-    <h3 class="text-sm font-bold text-clean">Devices</h3>
+    <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-clean">Devices</h3>
+        <span class="inline-flex items-center gap-1 text-[10px] text-emerald-400/70 font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Live
+        </span>
+    </div>
 
-    {
-        devices.length === 0 ? (
-            <p class="text-xs text-muted/60 py-4 text-center">
-                No device data yet.
-            </p>
+    <ul id="device-list" class="space-y-3">
+        {devices.length === 0 ? (
+            <li class="text-xs text-muted/60 py-4 text-center">No device data yet.</li>
         ) : (
-            <ul class="space-y-3">
-                {devices.map((d) => (
-                    <li class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-cyan/10 border border-cyan/20 flex items-center justify-center text-cyan flex-shrink-0">
-                            <Fragment
-                                set:html={
-                                    iconMap[d.name.toLowerCase()] ??
-                                    iconMap.unknown
-                                }
-                            />
+            devices.map((d) => (
+                <li class="flex items-center gap-3" data-device-name={d.name}>
+                    <div class="w-8 h-8 rounded-lg bg-cyan/10 border border-cyan/20 flex items-center justify-center text-cyan flex-shrink-0">
+                        <Fragment set:html={iconMap[d.name.toLowerCase()] ?? iconMap.unknown} />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-sm text-clean capitalize">{d.name}</span>
+                            <span class="device-count text-xs tabular-nums text-muted">
+                                {d.count} <span class="text-muted/50">({d.percent}%)</span>
+                            </span>
                         </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="text-sm text-clean capitalize">
-                                    {d.name}
-                                </span>
-                                <span class="text-xs tabular-nums text-muted">
-                                    {d.count}{" "}
-                                    <span class="text-muted/50">
-                                        ({d.percent}%)
-                                    </span>
-                                </span>
-                            </div>
-                            <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
-                                <div
-                                    class="h-full rounded-full bg-cyan transition-all duration-500"
-                                    style={`width: ${d.percent}%`}
-                                />
-                            </div>
+                        <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+                            <div class="device-bar h-full rounded-full bg-cyan transition-all duration-500" style={`width: ${d.percent}%`}/>
                         </div>
-                    </li>
-                ))}
-            </ul>
-        )
-    }
+                    </div>
+                </li>
+            ))
+        )}
+    </ul>
 </div>
+
+<div id="device-seed" data-devices={JSON.stringify(devices)} hidden></div>
+
+<script is:inline>
+(function () {
+    const seed = document.getElementById("device-seed");
+    const list = document.getElementById("device-list");
+    if (!seed || !list) return;
+
+    const ICONS = {
+        mobile:  "📱",
+        desktop: "🖥️",
+        tablet:  "📟",
+        unknown: "❓",
+    };
+
+    const counts = {};
+    JSON.parse(seed.dataset.devices || "[]").forEach(d => { counts[d.name] = d.count; });
+
+    function detectDevice(ua) {
+        if (!ua) return "unknown";
+        const u = ua.toLowerCase();
+        if (/ipad|tablet|(android(?!.*mobile))/.test(u)) return "tablet";
+        if (/mobile|android|iphone|ipod|blackberry|opera mini|iemobile/.test(u)) return "mobile";
+        return "desktop";
+    }
+
+    function renderItem(name, count, total) {
+        const pct = total === 0 ? 0 : Math.round((count / total) * 100);
+        const icon = ICONS[name.toLowerCase()] || ICONS.unknown;
+        return `<li class="flex items-center gap-3" data-device-name="${name}">
+            <div class="w-8 h-8 rounded-lg bg-cyan/10 border border-cyan/20 flex items-center justify-center text-cyan flex-shrink-0 text-base">${icon}</div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-sm text-clean capitalize">${name}</span>
+                    <span class="device-count text-xs tabular-nums text-muted">${count} <span class="text-muted/50">(${pct}%)</span></span>
+                </div>
+                <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+                    <div class="device-bar h-full rounded-full bg-cyan transition-all duration-500" style="width:${pct}%"></div>
+                </div>
+            </div>
+        </li>`;
+    }
+
+    function refresh() {
+        const total = Object.values(counts).reduce((s, v) => s + v, 0);
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        list.innerHTML = sorted.length === 0
+            ? '<li class="text-xs text-muted/60 py-4 text-center">No device data yet.</li>'
+            : sorted.map(([name, count]) => renderItem(name, count, total)).join("");
+    }
+
+    window.addEventListener("new-click", (e) => {
+        const d = e.detail;
+        const dev = (d.device && d.device !== "unknown") ? d.device : detectDevice(d.user_agent);
+        counts[dev] = (counts[dev] || 0) + 1;
+        refresh();
+    });
+})();
+</script>

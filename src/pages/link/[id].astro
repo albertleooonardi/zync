@@ -120,7 +120,8 @@ const referrers = buildReferrers();
 const devices = buildDevices();
 const geoData = buildGeo();
 const totalClicks = safeClicks.length;
-const shortUrl = `${Astro.url.host}/${link.alias}`;
+const siteUrl = (import.meta.env.PUBLIC_SITE_URL || Astro.url.origin).replace(/\/$/, "");
+const shortUrl = `${siteUrl}/${link.alias}`;
 ---
 
 <Layout

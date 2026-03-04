@@ -1,63 +1,91 @@
 ---
-interface GeoItem {
-    country: string;
-    count: number;
-    percent: number;
-}
-
-interface Props {
-    geoData: GeoItem[];
-}
-
+interface GeoItem { country: string; count: number; percent: number; }
+interface Props { geoData: GeoItem[]; }
 const { geoData } = Astro.props;
 
-// Simple country code → flag emoji
 function countryFlag(code: string): string {
     if (!code || code.length !== 2) return "🌍";
-    const codePoints = [...code.toUpperCase()].map(
-        (c) => 127397 + c.charCodeAt(0)
-    );
+    const codePoints = [...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0));
     return String.fromCodePoint(...codePoints);
 }
 ---
 
 <div class="rounded-2xl bg-river border border-white/5 p-5 space-y-4 h-full">
-    <h3 class="text-sm font-bold text-clean">Top Countries</h3>
+    <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-clean">Top Countries</h3>
+        <span class="inline-flex items-center gap-1 text-[10px] text-emerald-400/70 font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Live
+        </span>
+    </div>
 
-    {
-        geoData.length === 0 ? (
-            <p class="text-xs text-muted/60 py-4 text-center">
-                No location data yet.
-            </p>
+    <ol id="geo-list" class="space-y-3">
+        {geoData.length === 0 ? (
+            <li class="text-xs text-muted/60 py-4 text-center">No location data yet.</li>
         ) : (
-            <ol class="space-y-3">
-                {geoData.map((g, i) => (
-                    <li class="flex items-center gap-3">
-                        <span class="text-xs text-muted/60 tabular-nums w-4 text-right flex-shrink-0">
-                            {i + 1}
-                        </span>
-                        <span class="text-xl leading-none flex-shrink-0">
-                            {countryFlag(g.country)}
-                        </span>
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="text-sm text-clean truncate">
-                                    {g.country || "Unknown"}
-                                </span>
-                                <span class="text-xs tabular-nums text-muted ml-2">
-                                    {g.count}
-                                </span>
-                            </div>
-                            <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
-                                <div
-                                    class="h-full rounded-full bg-gradient-to-r from-cyan to-pink transition-all duration-500"
-                                    style={`width: ${g.percent}%`}
-                                />
-                            </div>
+            geoData.map((g, i) => (
+                <li class="flex items-center gap-3" data-geo-country={g.country}>
+                    <span class="text-xs text-muted/60 tabular-nums w-4 text-right flex-shrink-0">{i + 1}</span>
+                    <span class="text-xl leading-none flex-shrink-0">{countryFlag(g.country)}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-sm text-clean truncate">{g.country || "Unknown"}</span>
+                            <span class="geo-count text-xs tabular-nums text-muted ml-2">{g.count}</span>
                         </div>
-                    </li>
-                ))}
-            </ol>
-        )
-    }
+                        <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+                            <div class="geo-bar h-full rounded-full bg-gradient-to-r from-cyan to-pink transition-all duration-500" style={`width: ${g.percent}%`}/>
+                        </div>
+                    </div>
+                </li>
+            ))
+        )}
+    </ol>
 </div>
+
+<div id="geo-seed" data-geo={JSON.stringify(geoData)} hidden></div>
+
+<script is:inline>
+(function () {
+    const seed = document.getElementById("geo-seed");
+    const list = document.getElementById("geo-list");
+    if (!seed || !list) return;
+
+    const counts = {};
+    JSON.parse(seed.dataset.geo || "[]").forEach(g => { counts[g.country || "Unknown"] = g.count; });
+
+    function flagEmoji(code) {
+        if (!code || code.length !== 2) return "🌍";
+        return String.fromCodePoint(...[...code.toUpperCase()].map(c => 127397 + c.charCodeAt(0)));
+    }
+
+    function renderItem(country, count, pct, rank) {
+        return `<li class="flex items-center gap-3" data-geo-country="${country}">
+            <span class="text-xs text-muted/60 tabular-nums w-4 text-right flex-shrink-0">${rank}</span>
+            <span class="text-xl leading-none flex-shrink-0">${flagEmoji(country)}</span>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-sm text-clean truncate">${country || "Unknown"}</span>
+                    <span class="geo-count text-xs tabular-nums text-muted ml-2">${count}</span>
+                </div>
+                <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+                    <div class="geo-bar h-full rounded-full bg-gradient-to-r from-cyan to-pink transition-all duration-500" style="width:${pct}%"></div>
+                </div>
+            </div>
+        </li>`;
+    }
+
+    function refresh() {
+        const total = Object.values(counts).reduce((s, v) => s + v, 0);
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        list.innerHTML = sorted.length === 0
+            ? '<li class="text-xs text-muted/60 py-4 text-center">No location data yet.</li>'
+            : sorted.map(([country, count], i) => renderItem(country, count, total === 0 ? 0 : Math.round((count / total) * 100), i + 1)).join("");
+    }
+
+    window.addEventListener("new-click", (e) => {
+        const d = e.detail;
+        const country = d.country || "Unknown";
+        counts[country] = (counts[country] || 0) + 1;
+        refresh();
+    });
+})();
+</script>

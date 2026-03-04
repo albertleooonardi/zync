@@ -1,49 +1,79 @@
 ---
-interface ReferrerItem {
-    name: string;
-    count: number;
-    percent: number;
-}
-
-interface Props {
-    referrers: ReferrerItem[];
-}
-
+interface ReferrerItem { name: string; count: number; percent: number; }
+interface Props { referrers: ReferrerItem[]; }
 const { referrers } = Astro.props;
 ---
 
-<div class="rounded-2xl bg-river border border-white/5 p-5 space-y-4 h-full">
-    <h3 class="text-sm font-bold text-clean">Referrers</h3>
+<div class="rounded-2xl bg-river border border-white/5 p-5 space-y-4 h-full" id="referrer-card">
+    <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-clean">Referrers</h3>
+        <span id="ref-live-dot" class="inline-flex items-center gap-1 text-[10px] text-emerald-400/70 font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Live
+        </span>
+    </div>
 
-    {
-        referrers.length === 0 ? (
-            <p class="text-xs text-muted/60 py-4 text-center">
-                No referrer data yet.
-            </p>
+    <ul id="referrer-list" class="space-y-3">
+        {referrers.length === 0 ? (
+            <li class="text-xs text-muted/60 py-4 text-center">No referrer data yet.</li>
         ) : (
-            <ul class="space-y-3">
-                {referrers.map((r) => (
-                    <li>
-                        <div class="flex items-center justify-between mb-1">
-                            <span
-                                class="text-sm text-clean truncate max-w-[140px]"
-                                title={r.name}
-                            >
-                                {r.name}
-                            </span>
-                            <span class="text-sm tabular-nums text-muted ml-2">
-                                {r.count}
-                            </span>
-                        </div>
-                        <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
-                            <div
-                                class="h-full rounded-full bg-pink transition-all duration-500"
-                                style={`width: ${r.percent}%`}
-                            />
-                        </div>
-                    </li>
-                ))}
-            </ul>
-        )
-    }
+            referrers.map((r) => (
+                <li data-ref-name={r.name}>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm text-clean truncate max-w-[140px]" title={r.name}>{r.name}</span>
+                        <span class="ref-count text-sm tabular-nums text-muted ml-2">{r.count}</span>
+                    </div>
+                    <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+                        <div class="ref-bar h-full rounded-full bg-pink transition-all duration-500" style={`width: ${r.percent}%`}/>
+                    </div>
+                </li>
+            ))
+        )}
+    </ul>
 </div>
+
+<!-- Seed data for realtime updates -->
+<div id="ref-seed" data-referrers={JSON.stringify(referrers)} hidden></div>
+
+<script is:inline>
+(function () {
+    const seed = document.getElementById("ref-seed");
+    const list = document.getElementById("referrer-list");
+    if (!seed || !list) return;
+
+    // In-memory map of referrer counts
+    const counts = {};
+    JSON.parse(seed.dataset.referrers || "[]").forEach(r => { counts[r.name] = r.count; });
+
+    function renderItem(name, count, total) {
+        const pct = total === 0 ? 0 : Math.round((count / total) * 100);
+        return `<li data-ref-name="${name}">
+            <div class="flex items-center justify-between mb-1">
+                <span class="text-sm text-clean truncate max-w-[140px]" title="${name}">${name}</span>
+                <span class="ref-count text-sm tabular-nums text-muted ml-2">${count}</span>
+            </div>
+            <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+                <div class="ref-bar h-full rounded-full bg-pink transition-all duration-500" style="width:${pct}%"></div>
+            </div>
+        </li>`;
+    }
+
+    function refresh() {
+        const total = Object.values(counts).reduce((s, v) => s + v, 0);
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+        list.innerHTML = sorted.length === 0
+            ? '<li class="text-xs text-muted/60 py-4 text-center">No referrer data yet.</li>'
+            : sorted.map(([name, count]) => renderItem(name, count, total)).join("");
+    }
+
+    window.addEventListener("new-click", (e) => {
+        const d = e.detail;
+        let name = "Direct";
+        if (d.referrer) {
+            try { name = new URL(d.referrer).hostname.replace(/^www\./, ""); }
+            catch { name = d.referrer.slice(0, 30); }
+        }
+        counts[name] = (counts[name] || 0) + 1;
+        refresh();
+    });
+})();
+</script>
