@@ -30,7 +30,7 @@ const topLink = safeLinks.reduce<Link | null>(
     null
 );
 
-const baseUrl = Astro.url.origin;
+const baseUrl = import.meta.env.PUBLIC_SITE_URL || Astro.url.origin;
 const createdAlias = Astro.url.searchParams.get("created");
 
 // Time-aware greeting
