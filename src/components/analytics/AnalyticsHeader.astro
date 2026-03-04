@@ -15,39 +15,21 @@ const { originalUrl, shortUrl, linkId } = Astro.props;
         href="/dashboard"
         class="inline-flex items-center gap-1.5 text-sm text-muted hover:text-clean transition-colors"
     >
-        <svg
-            class="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-        >
-            <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M15 19l-7-7 7-7"></path>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path>
         </svg>
         Back to Dashboard
     </a>
 
     <!-- Title row -->
-    <div
-        class="flex flex-col md:flex-row md:items-start md:justify-between gap-4"
-    >
+    <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div class="min-w-0">
-            <h1
-                class="text-3xl font-black text-clean flex items-center gap-2 flex-wrap"
-            >
-                <span
-                    class="bg-gradient-to-r from-cyan to-pink bg-clip-text text-transparent font-mono"
-                >
+            <h1 class="text-3xl font-black text-clean flex items-center gap-2 flex-wrap">
+                <span class="bg-gradient-to-r from-cyan to-pink bg-clip-text text-transparent font-mono">
                     {shortUrl}
                 </span>
             </h1>
-            <p
-                class="text-sm text-muted mt-1 truncate max-w-xl"
-                title={originalUrl}
-            >
+            <p class="text-sm text-muted mt-1 truncate max-w-xl" title={originalUrl}>
                 {originalUrl}
             </p>
         </div>
@@ -61,69 +43,80 @@ const { originalUrl, shortUrl, linkId } = Astro.props;
                 data-url={shortUrl}
                 class="flex items-center gap-2 px-4 py-2 rounded-xl bg-river border border-white/10 text-sm text-muted hover:text-clean hover:border-white/20 transition-all duration-150"
             >
-                <svg
-                    id="copy-icon"
-                    class="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                    ></path>
+                <svg id="copy-icon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                 </svg>
                 <span id="copy-label">Copy Link</span>
             </button>
 
-            <!-- Edit Meta Tags (placeholder) -->
+            <!-- Meta Tags -->
             <button
                 type="button"
                 class="flex items-center gap-2 px-4 py-2 rounded-xl bg-river border border-white/10 text-sm text-muted hover:text-clean hover:border-white/20 transition-all duration-150"
                 title="Coming soon"
             >
-                <svg
-                    class="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-                    ></path>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
                 </svg>
                 Meta Tags
             </button>
 
-            <!-- Delete -->
-            <form
-                method="POST"
-                action={`/api/links/${linkId}/delete`}
-                onsubmit="return confirm('Are you sure you want to delete this link? This cannot be undone.')"
+            <!-- Delete triggers modal -->
+            <button
+                id="delete-link-btn"
+                type="button"
+                class="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 hover:bg-red-500/20 hover:border-red-500/40 transition-all duration-150"
             >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+                Delete
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Centered Delete Confirmation Modal ──────────────────────────────────── -->
+<div
+    id="delete-modal"
+    class="fixed inset-0 z-[9990] flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200"
+    aria-modal="true"
+    role="dialog"
+>
+    <!-- Backdrop -->
+    <div id="delete-modal-backdrop" class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+
+    <!-- Card -->
+    <div
+        id="delete-modal-card"
+        class="relative w-full max-w-sm rounded-2xl bg-[#111827] border border-white/10 shadow-2xl p-6 space-y-4 transform scale-95 transition-transform duration-200"
+    >
+        <!-- Icon -->
+        <div class="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto">
+            <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+        </div>
+
+        <div class="text-center space-y-1">
+            <p class="text-base font-bold text-clean">Delete this link?</p>
+            <p class="text-sm text-muted leading-relaxed">This action cannot be undone. All clicks and analytics for this link will be permanently lost.</p>
+        </div>
+
+        <div class="flex gap-3">
+            <button
+                id="delete-cancel-btn"
+                type="button"
+                class="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm font-semibold text-muted hover:text-clean hover:bg-white/10 transition-all duration-150"
+            >
+                Cancel
+            </button>
+            <form method="POST" action={`/api/links/${linkId}/delete`} class="flex-1">
                 <button
                     type="submit"
-                    class="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 hover:bg-red-500/20 hover:border-red-500/40 transition-all duration-150"
+                    class="w-full py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-all duration-150 active:scale-95"
                 >
-                    <svg
-                        class="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        ></path>
-                    </svg>
-                    Delete
+                    Yes, Delete
                 </button>
             </form>
         </div>
@@ -131,20 +124,47 @@ const { originalUrl, shortUrl, linkId } = Astro.props;
 </div>
 
 <script>
-    const btn = document.getElementById("copy-link-btn") as HTMLButtonElement;
-    const label = document.getElementById("copy-label")!;
-    const icon = document.getElementById("copy-icon")!;
+    // ── Copy button ──────────────────────────────────────────────────────────
+    const copyBtn = document.getElementById("copy-link-btn") as HTMLButtonElement;
+    const copyLabel = document.getElementById("copy-label")!;
+    const copyIcon = document.getElementById("copy-icon")!;
 
-    btn?.addEventListener("click", async () => {
-        const url = btn.dataset.url ?? "";
+    copyBtn?.addEventListener("click", async () => {
+        const url = copyBtn.dataset.url ?? "";
         await navigator.clipboard.writeText(url);
-        label.textContent = "Copied!";
-        icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>`;
-        btn.classList.add("text-cyan", "border-cyan/30");
+        copyLabel.textContent = "Copied!";
+        copyIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>`;
+        copyBtn.classList.add("text-cyan", "border-cyan/30");
         setTimeout(() => {
-            label.textContent = "Copy Link";
-            icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>`;
-            btn.classList.remove("text-cyan", "border-cyan/30");
+            copyLabel.textContent = "Copy Link";
+            copyIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>`;
+            copyBtn.classList.remove("text-cyan", "border-cyan/30");
         }, 2000);
     });
+
+    // ── Delete modal ─────────────────────────────────────────────────────────
+    const deleteBtn    = document.getElementById("delete-link-btn");
+    const modal        = document.getElementById("delete-modal")!;
+    const modalCard    = document.getElementById("delete-modal-card")!;
+    const cancelBtn    = document.getElementById("delete-cancel-btn");
+    const backdrop     = document.getElementById("delete-modal-backdrop");
+
+    function openModal() {
+        modal.style.opacity = "1";
+        modal.style.pointerEvents = "auto";
+        modalCard.style.transform = "scale(1)";
+        document.body.style.overflow = "hidden";
+    }
+
+    function closeModal() {
+        modal.style.opacity = "0";
+        modal.style.pointerEvents = "none";
+        modalCard.style.transform = "scale(0.95)";
+        document.body.style.overflow = "";
+    }
+
+    deleteBtn?.addEventListener("click", openModal);
+    cancelBtn?.addEventListener("click", closeModal);
+    backdrop?.addEventListener("click", closeModal);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
 </script>
