@@ -112,7 +112,7 @@ const greeting =
                 label="Total Clicks (All Time)"
                 value={totalClicks.toLocaleString()}
                 accent="pink"
-                valueId="live-total-clicks"
+                valueId="total-clicks-counter"
             >
                 <svg
                     fill="none"
@@ -204,11 +204,12 @@ const greeting =
 
     function recomputeTotalCard() {
         const total = Object.values(counts).reduce((s, v) => s + v, 0);
-        const el = document.getElementById("live-total-clicks");
+        const el = document.getElementById("total-clicks-counter");
         if (el) {
             el.textContent = total.toLocaleString();
-            el.classList.add("!text-cyan");
-            setTimeout(() => el.classList.remove("!text-cyan"), 700);
+            el.style.color = "#06B6D4";
+            el.style.transition = "color 0.5s ease";
+            setTimeout(() => { el.style.color = ""; }, 700);
         }
     }
 
@@ -224,7 +225,7 @@ const greeting =
                 counts[id] = click_count;
 
                 // Patch the row cell
-                const cell = document.getElementById(`clicks-${id}`);
+                const cell = document.getElementById(`link-click-count-${id}`);
                 if (cell) {
                     cell.textContent = click_count.toLocaleString();
                     cell.classList.add("!text-cyan");
@@ -259,7 +260,7 @@ const greeting =
                 const newClick = payload.new;
                 // Only act if this click belongs to one of our tracked links
                 if (newClick.link_id && newClick.link_id in counts) {
-                     const el = document.getElementById("live-total-clicks");
+                     const el = document.getElementById("total-clicks-counter");
                      if (el) {
                          const currentText = el.textContent?.replace(/,/g, "") || "0";
                          const newTotal = parseInt(currentText, 10) + 1;
@@ -277,7 +278,7 @@ const greeting =
                          counts[newClick.link_id] += 1;
                          
                          // Update individual row cell
-                         const cell = document.getElementById(`clicks-${newClick.link_id}`);
+                         const cell = document.getElementById(`link-click-count-${newClick.link_id}`);
                          if (cell) {
                              cell.textContent = counts[newClick.link_id].toLocaleString();
                              cell.style.color = "#06B6D4";
@@ -287,7 +288,7 @@ const greeting =
                              }, 500);
                          }
                      } else {
-                         console.warn("Element #live-total-clicks not found in the DOM.");
+                         console.warn("Element #total-clicks-counter not found in the DOM.");
                      }
                 }
             }
