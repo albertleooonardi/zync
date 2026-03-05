@@ -243,31 +243,50 @@ const greeting =
     // But the user expressly asked to "Target the clicks table for INSERT events."
     // Let's implement EXACTLY what the user requested, modifying just the `clicks` table subscription.
     
+    console.log("Initializing Supabase Realtime subscriptions...");
+
     sb.channel("dashboard-clicks")
         .on(
             "postgres_changes",
             { event: "INSERT", schema: "public", table: "clicks" },
             (payload) => {
-                const newClick = payload.new as { link_id: string };
+                console.log("🔥 Realtime INSERT received for clicks table!", payload);
+                const newClick = payload.new;
                 // Only act if this click belongs to one of our tracked links
                 if (newClick.link_id && newClick.link_id in counts) {
                      const el = document.getElementById("live-total-clicks");
                      if (el) {
                          const currentText = el.textContent?.replace(/,/g, "") || "0";
                          const newTotal = parseInt(currentText, 10) + 1;
+                         
+                         console.log(`Incrementing click counter: ${currentText} -> ${newTotal}`);
                          el.textContent = newTotal.toLocaleString();
                          
-                         // Subtle temporary UI animation
-                         el.classList.add("!text-cyan", "transition-colors", "duration-500");
+                         // Subtle temporary UI animation (Cyan #06B6D4)
+                         el.style.color = "#06B6D4";
+                         el.style.transition = "color 0.5s ease";
                          setTimeout(() => {
-                             el.classList.remove("!text-cyan");
+                             el.style.color = "";
                          }, 500);
                          
                          // Keep our internal counter in sync just in case
                          counts[newClick.link_id] += 1;
+                     } else {
+                         console.warn("Element #live-total-clicks not found in the DOM.");
                      }
                 }
             }
         )
-        .subscribe();
+        .subscribe((status, err) => {
+            console.log("Supabase Realtime [clicks] Subscription Status:", status);
+            if (status === 'SUBSCRIBED') {
+                console.log("✅ Successfully connected to Supabase Realtime for clicks table!");
+            } else if (status === 'CHANNEL_ERROR') {
+                console.error("❌ Realtime Channel Error:", err);
+            } else if (status === 'TIMED_OUT') {
+                console.warn("⏳ Realtime Subscription Timed Out.");
+            } else if (status === 'CLOSED') {
+                console.log("🔌 Realtime Connection Closed.");
+            }
+        });
 </script>
