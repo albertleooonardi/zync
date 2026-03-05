@@ -191,6 +191,11 @@ const greeting =
             headers: token ? { Authorization: `Bearer ${token}` } : {}
         }
     });
+    
+    // Explicitly set the realtime token because we are not using the auth session
+    if (token) {
+        sb.realtime.setAuth(token);
+    }
 
     // Track click counts in memory so we can recompute the total card
     const links: { id: string; click_count: number }[] = JSON.parse(cfg.dataset.links ?? "[]");
@@ -269,8 +274,18 @@ const greeting =
                              el.style.color = "";
                          }, 500);
                          
-                         // Keep our internal counter in sync just in case
                          counts[newClick.link_id] += 1;
+                         
+                         // Update individual row cell
+                         const cell = document.getElementById(`clicks-${newClick.link_id}`);
+                         if (cell) {
+                             cell.textContent = counts[newClick.link_id].toLocaleString();
+                             cell.style.color = "#06B6D4";
+                             cell.style.transition = "color 0.5s ease";
+                             setTimeout(() => {
+                                 cell.style.color = "";
+                             }, 500);
+                         }
                      } else {
                          console.warn("Element #live-total-clicks not found in the DOM.");
                      }
