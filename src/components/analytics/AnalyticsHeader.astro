@@ -7,7 +7,7 @@ interface Props {
     linkId: string;
 }
 
-const { originalUrl, shortUrl, displayShortUrl = shortUrl, linkId } = Astro.props;
+const { alias, originalUrl, shortUrl, displayShortUrl = shortUrl, linkId } = Astro.props;
 ---
 
 <div class="space-y-4">
@@ -25,14 +25,18 @@ const { originalUrl, shortUrl, displayShortUrl = shortUrl, linkId } = Astro.prop
     <!-- Title row -->
     <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div class="min-w-0">
-            <h1 class="text-3xl font-black text-clean flex items-center gap-2 flex-wrap">
-                <span class="bg-gradient-to-r from-cyan to-pink bg-clip-text text-transparent font-mono">
-                    {displayShortUrl}
-                </span>
+            <h1 class="text-3xl font-black text-clean">
+                {alias}
             </h1>
-            <p class="text-sm text-muted mt-1 truncate max-w-xl" title={originalUrl}>
+            <a
+                href={originalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-sm text-muted mt-1 truncate max-w-xl block hover:text-cyan transition-colors duration-150"
+                title={originalUrl}
+            >
                 {originalUrl}
-            </p>
+            </a>
         </div>
 
         <!-- Action buttons -->
